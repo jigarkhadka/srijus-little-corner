@@ -1021,24 +1021,30 @@ const AudioPlayer = ({ activeSection, ambientSound }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef(null);
   
-  // Logic for picking track based on section & ambient sound setting
-  let trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/Tum%20Se%20Hi%20Jab%20We%20Met%20128%20Kbps.mp3"; // Default: Tum Se Hi (placeholder)
+  // 1. Determine track URL based on section & ambient sound choice
+  let trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/Tum%20Se%20Hi%20Jab%20We%20Met%20128%20Kbps.mp3"; 
   if (activeSection === 'study') {
     if (ambientSound === 'piano') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/e17a138f57b3abecf2e620d537bca1dde11ed013/leberch-ambient-piano-595681.mp3";
-    else if (ambientSound === 'rain') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/freesound_community-rain-sound-and-rainforest-6293.mp3"; // Placeholders
+    else if (ambientSound === 'rain') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/freesound_community-rain-sound-and-rainforest-6293.mp3";
     else if (ambientSound === 'forest') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/zephiramusic-lofi-study-581724(2).mp3";
   }
   
+  // 2. FIXED: Only reload audio when the `trackUrl` itself changes, NOT when `activeSection` changes!
   useEffect(() => {
-    if (audioRef.current && isPlaying) {
-      audioRef.current.pause(); audioRef.current.load();
-      audioRef.current.play().catch(e => console.log("Autoplay prevented"));
+    if (audioRef.current) {
+      audioRef.current.load();
+      if (isPlaying) {
+        audioRef.current.play().catch(e => console.log("Autoplay prevented", e));
+      }
     }
-  }, [activeSection, trackUrl, ambientSound]);
+  }, [trackUrl]); // <-- Notice `activeSection` is removed from here
 
   const togglePlay = () => {
-    if (isPlaying) audioRef.current.pause();
-    else audioRef.current.play().catch(e => console.log("Play prevented"));
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(e => console.log("Play prevented", e));
+    }
     setIsPlaying(!isPlaying);
   };
 
@@ -1050,7 +1056,7 @@ const AudioPlayer = ({ activeSection, ambientSound }) => {
       </button>
       <div className="hidden md:flex flex-col">
         <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-[#826454] font-bold">
-          {activeSection === 'study' ? (ambientSound === 'piano' ? 'Piano Focus' : ambientSound === 'rain' ? 'Rainstorm' : 'Forest Calm') : 'Tum Se Hi'}
+          {activeSection === 'study' ? (ambientSound === 'piano' ? 'Piano Focus' : ambientSound === 'rain' ? 'Rainstorm' : 'Lofi Study') : 'Tum Se Hi'}
         </span>
         <span className="text-[10px] font-sans text-[#826454]/70 mt-0.5">{isPlaying ? 'Playing' : 'Paused'}</span>
       </div>
