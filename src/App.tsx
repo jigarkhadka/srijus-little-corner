@@ -5,7 +5,8 @@ import {
   Trash2, Plus, Clock, RefreshCw, Pin, Coffee, Edit2, Target, StickyNote, Sun,
   Moon, Cloud, Sparkles, Key, Wind, Droplet, Gift, Send, Lock, PenTool,
   CircleDashed, Calendar, Image as ImageIcon, Music, Gamepad2, Volume2, CloudRain,
-  Trees, Camera, Star, Upload, PartyPopper, X
+  Trees, Camera, Star, Upload, PartyPopper, Download, X, Flame, BarChart3,
+  TrendingUp, PiggyBank, Snowflake
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -37,6 +38,13 @@ interface ExpenseItem {
   amount: number;
 }
 
+interface SavingsDeposit {
+  id: number;
+  amount: number;
+  note: string;
+  date: string; // YYYY-MM-DD
+}
+
 interface DiaryEntry {
   id: number;
   date: string;
@@ -63,6 +71,13 @@ interface OpenWhenLetter {
   id: number;
   title: string;
   msg: string;
+}
+
+interface StudySession {
+  id: number;
+  date: string; // YYYY-MM-DD
+  startedAt: number;
+  durationSeconds: number;
 }
 
 /* -------------------- Constants -------------------- */
@@ -135,6 +150,14 @@ const STUDY_TRACKS: Record<string, { url: string; label: string }> = {
   ocean:  { url: '/audio/ocean.mp3',  label: 'Ocean Waves' },
 };
 
+const STICKY_COLORS = [
+  { bg: '#F7E9A0', pin: '#D4A373' }, // yellow
+  { bg: '#F4D7DF', pin: '#C69C9C' }, // pink
+  { bg: '#D5E8D4', pin: '#9CA893' }, // mint
+  { bg: '#D6E4F0', pin: '#84A59D' }, // sky
+  { bg: '#E4DAF0', pin: '#A89CC8' }, // lilac
+];
+
 /* -------------------- Helpers -------------------- */
 function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {
@@ -177,16 +200,10 @@ function useCloudStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
         setStoredValue(data.value as T);
         try {
           window.localStorage.setItem(key, JSON.stringify(data.value));
-        } catch {
-          /* ignore quota errors */
-        }
+        } catch { /* ignore quota errors */ }
       })
-      .catch(() => {
-        /* offline, or /api/state not deployed yet — keep using the local copy */
-      });
-    return () => {
-      cancelled = true;
-    };
+      .catch(() => { /* offline or KV not deployed — local copy only */ });
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
@@ -195,18 +212,14 @@ function useCloudStorage<T>(key: string, initialValue: T): [T, (value: T | ((val
       const valueToStore = value instanceof Function ? value(prev) : value;
       try {
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
-      } catch (error) {
-        console.log(error);
-      }
+      } catch (error) { console.log(error); }
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
         fetch('/api/state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key, value: valueToStore }),
-        }).catch(() => {
-          /* save failed (offline / KV not configured) — localStorage copy above still holds */
-        });
+        }).catch(() => { /* localStorage copy above still holds */ });
       }, 500);
       return valueToStore;
     });
@@ -226,9 +239,7 @@ function extractYouTubeId(input: string): string | null {
     if (v) return v;
     const embedMatch = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
     if (embedMatch) return embedMatch[1];
-  } catch {
-    return null;
-  }
+  } catch { return null; }
   return null;
 }
 
@@ -246,6 +257,34 @@ const getMoonPhase = () => {
   if (phase < 0.8) return { name: "Last Quarter", icon: "🌗" };
   return { name: "Waning Crescent", icon: "🌘" };
 };
+
+function weatherInfo(code: number): { icon: string; label: string; note: string } {
+  if (code === 0) return { icon: '☀️', label: 'Clear skies', note: 'Perfect day for a walk, Tingu.' };
+  if (code === 1) return { icon: '🌤️', label: 'Mostly clear', note: 'Lovely out there.' };
+  if (code === 2) return { icon: '⛅', label: 'Partly cloudy', note: 'Gentle day today.' };
+  if (code === 3) return { icon: '☁️', label: 'Overcast', note: 'Cozy blanket weather.' };
+  if (code === 45 || code === 48) return { icon: '🌫️', label: 'Foggy', note: 'Careful out there.' };
+  if (code >= 51 && code <= 57) return { icon: '🌦️', label: 'Drizzling', note: 'Bring a light jacket.' };
+  if (code >= 61 && code <= 67) return { icon: '🌧️', label: 'Rainy', note: 'Stay dry and think of me.' };
+  if (code >= 71 && code <= 77) return { icon: '🌨️', label: 'Snowing', note: 'Bundle up, my love.' };
+  if (code >= 80 && code <= 82) return { icon: '🌦️', label: 'Rain showers', note: 'Umbrella day.' };
+  if (code >= 85 && code <= 86) return { icon: '🌨️', label: 'Snow showers', note: 'Stay warm.' };
+  if (code >= 95) return { icon: '⛈️', label: 'Thunderstorm', note: 'Stay safe inside.' };
+  return { icon: '🌡️', label: 'Unknown', note: '' };
+}
+
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}
+
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const playTimerAlarm = () => {
   try {
@@ -269,9 +308,7 @@ const playTimerAlarm = () => {
       osc.stop(now + offset + 0.45);
     });
     if (ctx.state === 'suspended') ctx.resume();
-  } catch (e) {
-    console.log('Timer alarm failed:', e);
-  }
+  } catch (e) { console.log('Timer alarm failed:', e); }
 };
 
 const noiseSvg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`;
@@ -303,14 +340,8 @@ function loadYouTubeApi(): Promise<any> {
 
 /* -------------------- Floating Environment -------------------- */
 interface Petal {
-  id: number;
-  x: number;
-  y: number;
-  size: number;
-  duration: number;
-  delay: number;
-  rotation: number;
-  type: 'petal' | 'orb';
+  id: number; x: number; y: number; size: number; duration: number;
+  delay: number; rotation: number; type: 'petal' | 'orb';
 }
 
 const FloatingEnvironment: React.FC = () => {
@@ -355,12 +386,7 @@ const FloatingEnvironment: React.FC = () => {
 };
 
 /* -------------------- Nav Button -------------------- */
-interface NavBtnProps {
-  icon: LucideIcon;
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-}
+interface NavBtnProps { icon: LucideIcon; label: string; isActive: boolean; onClick: () => void; }
 
 const NavBtn: React.FC<NavBtnProps> = ({ icon: Icon, label, isActive, onClick }) => (
   <button
@@ -422,7 +448,7 @@ const OpeningSequence: React.FC<{ onComplete: () => void }> = ({ onComplete }) =
   );
 };
 
-/* -------------------- Home Section -------------------- */
+/* -------------------- Home Section (with weather) -------------------- */
 interface HomeSectionProps {
   setSection: (section: string) => void;
   triggerEasterEgg: () => void;
@@ -437,13 +463,12 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
   const [fortuneMsg, setFortuneMsg] = useState('Crack me open!');
   const [timeTogether, setTimeTogether] = useState({ days: 0, hrs: 0 });
   const moonPhase = getMoonPhase();
+  const [weather, setWeather] = useState<{ temp: number; code: number; location: string } | null>(null);
 
   const [showPeriodHub, setShowPeriodHub] = useState(false);
   const [lastPeriod, setLastPeriod] = useCloudStorage<string | null>('sriju_last_period', null);
-
   const [plantLevel, setPlantLevel] = useCloudStorage<number>('sriju_plant_level', 1);
   const [lastWatered, setLastWatered] = useCloudStorage<string | null>('sriju_plant_watered', null);
-
   const [locketImage, setLocketImage] = useLocalStorage<string | null>('sriju_locket_img', null);
   const [isLocketOpen, setIsLocketOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -475,6 +500,25 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
     };
     calcTime();
     const timer = setInterval(calcTime, 1000 * 60 * 60);
+
+    // Weather from Open-Meteo (free, no key) — Kathmandu
+    const ITAHARI_LAT = 26.6636;
+    const ITAHARI_LON = 87.2741;
+    fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${ITAHARI_LAT}&longitude=${ITAHARI_LON}&current=temperature_2m,weather_code&timezone=Asia/Kathmandu`
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.current) {
+          setWeather({
+            temp: Math.round(data.current.temperature_2m),
+            code: data.current.weather_code,
+            location: 'Itahari',
+          });
+        }
+      })
+      .catch(() => { /* offline — no weather, no problem */ });
+
     return () => clearInterval(timer);
   }, []);
 
@@ -510,10 +554,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
     const interval = setInterval(() => {
       setFoodChoice(foods[Math.floor(Math.random() * foods.length)]);
       count++;
-      if (count > 20) {
-        clearInterval(interval);
-        setSpinning(false);
-      }
+      if (count > 20) { clearInterval(interval); setSpinning(false); }
     }, 100);
   };
 
@@ -521,6 +562,8 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
   const daysUntilNext = nextPeriodDate
     ? Math.ceil((nextPeriodDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
     : null;
+
+  const wi = weather ? weatherInfo(weather.code) : null;
 
   return (
     <motion.div
@@ -551,9 +594,18 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
               {greetingIcon}
               <h2 className="font-serif text-3xl md:text-5xl text-[#2C302E]">{greeting}, Tingu.</h2>
             </div>
-            <p className="font-sans text-[#826454] text-base md:text-lg pl-12">
-              I built this place just for you. Take your time.
-            </p>
+            {wi && weather ? (
+              <p className="font-sans text-[#826454] text-base md:text-lg pl-12 flex items-start gap-2">
+                <span className="text-2xl leading-none">{wi.icon}</span>
+                <span>
+                  It's <strong className="text-[#633131]">{weather.temp}°C</strong> and {wi.label.toLowerCase()} in {weather.location}. {wi.note}
+                </span>
+              </p>
+            ) : (
+              <p className="font-sans text-[#826454] text-base md:text-lg pl-12">
+                I built this place just for you. Take your time.
+              </p>
+            )}
           </motion.div>
 
           <motion.div
@@ -617,9 +669,6 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
               >
                 {foodChoice}
               </motion.div>
-              <p className="font-sans text-[10px] text-[#826454] mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                Spin me
-              </p>
             </motion.div>
 
             <div className="bg-[#2C302E] p-4 rounded-3xl shadow-sm flex flex-col items-center justify-center h-32 text-center relative overflow-hidden col-span-2 md:col-span-2 border border-[#4A4343]">
@@ -679,11 +728,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
           >
             <div className="w-16 h-16 rounded-full border-[3px] border-[#C69C9C] bg-[#FDFBF7] flex items-center justify-center shadow-inner relative z-10 overflow-hidden">
               {locketImage ? (
-                <img
-                  src={locketImage}
-                  alt="Locket"
-                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                />
+                <img src={locketImage} alt="Locket" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
               ) : (
                 <Camera size={24} className="text-[#C69C9C]" />
               )}
@@ -731,25 +776,15 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
       <AnimatePresence>
         {showPeriodHub && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F5E6E6]/95 backdrop-blur-md px-4"
           >
             <div className="max-w-md w-full bg-white p-10 rounded-[3rem] text-center shadow-2xl border border-[#E5D5D5] relative overflow-hidden">
-              <button
-                onClick={() => setShowPeriodHub(false)}
-                className="absolute top-6 right-6 text-[#633131] hover:text-black"
-              >
-                Close
-              </button>
+              <button onClick={() => setShowPeriodHub(false)} className="absolute top-6 right-6 text-[#633131] hover:text-black">Close</button>
               <div className="text-5xl mb-6 flex justify-center gap-4">🍫 🧸 🫖</div>
               <h2 className="font-serif text-3xl text-[#633131] mb-2">Tingu's Comfort Hub</h2>
-
               <div className="bg-[#FDFBF7] p-4 rounded-2xl mb-6 border border-[#E5D5D5] mt-6">
-                <p className="font-sans text-sm text-[#826454] mb-2 uppercase tracking-widest">
-                  Cycle Tracker
-                </p>
+                <p className="font-sans text-sm text-[#826454] mb-2 uppercase tracking-widest">Cycle Tracker</p>
                 <div className="flex items-center justify-center gap-4">
                   <input
                     type="date"
@@ -760,24 +795,15 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
                 </div>
                 {daysUntilNext !== null && (
                   <p className="font-serif text-lg text-[#633131] mt-3">
-                    {daysUntilNext > 0
-                      ? `Next cycle in roughly ${daysUntilNext} days`
-                      : 'Take care of yourself today.'}
+                    {daysUntilNext > 0 ? `Next cycle in roughly ${daysUntilNext} days` : 'Take care of yourself today.'}
                   </p>
                 )}
               </div>
-
               <p className="font-sans text-[#826454] text-lg leading-relaxed mb-6">
-                I know it hurts right now. Get your hot water bag, eat some chocolate, and rest. You
-                don't have to do anything else today except take care of yourself.
+                I know it hurts right now. Get your hot water bag, eat some chocolate, and rest. You don't have to do anything else today except take care of yourself.
               </p>
-
               <button
-                onClick={() => {
-                  setShowPeriodHub(false);
-                  setShowHug(true);
-                  setTimeout(() => setShowHug(false), 3000);
-                }}
+                onClick={() => { setShowPeriodHub(false); setShowHug(true); setTimeout(() => setShowHug(false), 3000); }}
                 className="w-full bg-[#C69C9C] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#B58B8B] transition-colors shadow-sm"
               >
                 Request Emergency Hug
@@ -790,9 +816,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
       <AnimatePresence>
         {isLocketOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
           >
             <motion.div
@@ -802,12 +826,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
               transition={{ type: 'spring', duration: 1 }}
               className="max-w-sm w-full bg-[#E8E1D3] p-4 rounded-[2rem] border-[4px] border-[#D4A373] shadow-2xl relative"
             >
-              <button
-                onClick={() => setIsLocketOpen(false)}
-                className="absolute -top-12 right-0 text-white font-sans text-sm"
-              >
-                Close
-              </button>
+              <button onClick={() => setIsLocketOpen(false)} className="absolute -top-12 right-0 text-white font-sans text-sm">Close</button>
               <div className="aspect-[3/4] bg-[#2C302E] rounded-2xl overflow-hidden relative flex items-center justify-center border-4 border-[#FDFBF7]">
                 {locketImage ? (
                   <img src={locketImage} alt="Locket Memory" className="w-full h-full object-cover" />
@@ -815,18 +834,10 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
                   <div className="text-center p-6 text-[#A3B18A]">
                     <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="font-serif text-lg">Empty Locket</p>
-                    <p className="font-sans text-xs mt-2 opacity-70">
-                      Upload one special photo to keep here forever.
-                    </p>
+                    <p className="font-sans text-xs mt-2 opacity-70">Upload one special photo to keep here forever.</p>
                   </div>
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  ref={fileInputRef}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={handleImageUpload} ref={fileInputRef} className="hidden" />
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute bottom-4 right-4 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40 transition-colors"
@@ -842,9 +853,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
       <AnimatePresence>
         {showHug && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20 backdrop-blur-sm pointer-events-none"
           >
             <motion.div
@@ -855,9 +864,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
               className="flex flex-col items-center"
             >
               <Heart size={150} className="text-[#C69C9C] fill-[#C69C9C]" />
-              <h2 className="font-serif text-6xl text-white mt-6 drop-shadow-lg tracking-widest">
-                SQUEEEEEZE!
-              </h2>
+              <h2 className="font-serif text-6xl text-white mt-6 drop-shadow-lg tracking-widest">SQUEEEEEZE!</h2>
             </motion.div>
           </motion.div>
         )}
@@ -867,10 +874,7 @@ const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg 
 };
 
 /* -------------------- Mood Corner -------------------- */
-interface MoodCornerProps {
-  currentMood: Mood | null;
-  setAppMood: (mood: Mood) => void;
-}
+interface MoodCornerProps { currentMood: Mood | null; setAppMood: (mood: Mood) => void; }
 
 const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
   const [showBreathing, setShowBreathing] = useState(false);
@@ -887,9 +891,7 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="max-w-5xl mx-auto min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 relative z-10"
     >
       <div className="absolute top-0 right-4 flex gap-4">
@@ -902,9 +904,7 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
       </div>
 
       <div className="text-center mb-12 mt-12">
-        <h2 className="font-serif text-5xl text-[#2C302E] mb-4 drop-shadow-sm">
-          How are you feeling?
-        </h2>
+        <h2 className="font-serif text-5xl text-[#2C302E] mb-4 drop-shadow-sm">How are you feeling?</h2>
         <p className="font-sans text-[#826454] text-lg">Tap a color. The whole room will listen to you.</p>
       </div>
 
@@ -919,10 +919,7 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
           >
             <div className="relative">
               {currentMood?.id === mood.id && (
-                <motion.div
-                  layoutId="mood-glow"
-                  className="absolute -inset-6 bg-white/70 rounded-full blur-2xl"
-                />
+                <motion.div layoutId="mood-glow" className="absolute -inset-6 bg-white/70 rounded-full blur-2xl" />
               )}
               <svg
                 viewBox="0 0 200 150"
@@ -936,9 +933,7 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
             </div>
             <span
               className={`font-sans text-sm md:text-base uppercase tracking-widest transition-all duration-500 ${
-                currentMood?.id === mood.id
-                  ? 'text-[#633131] font-bold tracking-[0.3em]'
-                  : 'text-[#826454]'
+                currentMood?.id === mood.id ? 'text-[#633131] font-bold tracking-[0.3em]' : 'text-[#826454]'
               }`}
             >
               {mood.label}
@@ -956,13 +951,8 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
             exit={{ opacity: 0, y: -20, scale: 0.9 }}
             className="bg-white/70 backdrop-blur-2xl p-10 md:p-12 rounded-[2.5rem] border border-white max-w-2xl text-center shadow-md relative overflow-hidden mb-12 w-full"
           >
-            <div
-              className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl opacity-30"
-              style={{ backgroundColor: currentMood.color }}
-            />
-            <p className="font-serif text-2xl md:text-3xl text-[#633131] leading-relaxed relative z-10">
-              "{currentMood.msg}"
-            </p>
+            <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl opacity-30" style={{ backgroundColor: currentMood.color }} />
+            <p className="font-serif text-2xl md:text-3xl text-[#633131] leading-relaxed relative z-10">"{currentMood.msg}"</p>
           </motion.div>
         )}
       </AnimatePresence>
@@ -978,17 +968,10 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
       <AnimatePresence>
         {showBreathing && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F9F6F0]/90 backdrop-blur-sm"
           >
-            <button
-              onClick={() => setShowBreathing(false)}
-              className="absolute top-10 right-10 text-[#826454] hover:text-[#2C302E]"
-            >
-              Close
-            </button>
+            <button onClick={() => setShowBreathing(false)} className="absolute top-10 right-10 text-[#826454] hover:text-[#2C302E]">Close</button>
             <h2 className="font-serif text-4xl text-[#633131] mb-12">Breathe with me</h2>
             <motion.div
               animate={{ scale: [1, 2, 1], backgroundColor: ['#DCE0D9', '#9CA893', '#DCE0D9'] }}
@@ -1009,23 +992,13 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
       <AnimatePresence>
         {showMemoryJar && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md px-4"
           >
             <div className="max-w-2xl w-full bg-[#FDFBF7] p-8 md:p-12 rounded-[3rem] border border-[#E5D5D5] shadow-2xl relative flex flex-col items-center">
-              <button
-                onClick={() => setShowMemoryJar(false)}
-                className="absolute top-6 right-6 text-[#826454]"
-              >
-                Close
-              </button>
+              <button onClick={() => setShowMemoryJar(false)} className="absolute top-6 right-6 text-[#826454]">Close</button>
               <h2 className="font-serif text-4xl text-[#633131] mb-2">Memory Jar</h2>
-              <p className="font-sans text-[#826454] text-sm mb-8">
-                Drop a tiny memory in here to keep forever.
-              </p>
-
+              <p className="font-sans text-[#826454] text-sm mb-8">Drop a tiny memory in here to keep forever.</p>
               <div className="relative w-48 h-64 border-4 border-white bg-white/20 rounded-b-[3rem] rounded-t-lg shadow-inner mb-8 overflow-hidden flex flex-wrap-reverse content-start p-4 gap-2">
                 <div className="absolute top-0 left-0 w-full h-8 bg-white/40 border-b-4 border-white" />
                 {memories.map((m) => (
@@ -1042,7 +1015,6 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
                   </motion.div>
                 ))}
               </div>
-
               <form onSubmit={addMemory} className="w-full flex gap-3">
                 <input
                   type="text"
@@ -1051,10 +1023,7 @@ const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
                   placeholder="Remember when we..."
                   className="flex-1 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
                 />
-                <button
-                  type="submit"
-                  className="bg-[#9CA893] text-white px-6 py-3 rounded-xl hover:bg-[#8A9682] transition-colors shadow-sm"
-                >
+                <button type="submit" className="bg-[#9CA893] text-white px-6 py-3 rounded-xl hover:bg-[#8A9682] transition-colors shadow-sm">
                   Save
                 </button>
               </form>
@@ -1072,11 +1041,7 @@ const TicTacToe: React.FC = () => {
   const [isXNext, setIsXNext] = useState(true);
 
   const checkWinner = (squares: (string | null)[]) => {
-    const lines = [
-      [0, 1, 2], [3, 4, 5], [6, 7, 8],
-      [0, 3, 6], [1, 4, 7], [2, 5, 8],
-      [0, 4, 8], [2, 4, 6],
-    ];
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
     for (let i = 0; i < lines.length; i++) {
       const [a, b, c] = lines[i];
       if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a];
@@ -1098,9 +1063,7 @@ const TicTacToe: React.FC = () => {
   useEffect(() => {
     if (!isXNext && !winner && !isDraw) {
       const timer = setTimeout(() => {
-        const emptyIndices = board
-          .map((val, idx) => (val === null ? idx : null))
-          .filter((val): val is number => val !== null);
+        const emptyIndices = board.map((val, idx) => (val === null ? idx : null)).filter((val): val is number => val !== null);
         if (emptyIndices.length > 0) {
           const randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
           const newBoard = [...board];
@@ -1118,11 +1081,7 @@ const TicTacToe: React.FC = () => {
       <h3 className="font-['Caveat'] text-4xl text-[#826454] mb-6">Play a quick game!</h3>
       <div className="grid grid-cols-3 gap-2 bg-[#E5D5D5] p-2 rounded-2xl w-64 h-64 shadow-inner">
         {board.map((cell, i) => (
-          <button
-            key={i}
-            onClick={() => handleClick(i)}
-            className="bg-white rounded-xl flex items-center justify-center text-4xl hover:bg-[#F9F6F0] transition-colors"
-          >
+          <button key={i} onClick={() => handleClick(i)} className="bg-white rounded-xl flex items-center justify-center text-4xl hover:bg-[#F9F6F0] transition-colors">
             {cell === 'H' && <Heart className="text-[#C69C9C] fill-[#C69C9C]" size={40} />}
             {cell === 'S' && <Star className="text-[#9CA893] fill-[#9CA893]" size={40} />}
           </button>
@@ -1133,15 +1092,175 @@ const TicTacToe: React.FC = () => {
       </div>
       {(winner || isDraw) && (
         <button
-          onClick={() => {
-            setBoard(Array(9).fill(null));
-            setIsXNext(true);
-          }}
+          onClick={() => { setBoard(Array(9).fill(null)); setIsXNext(true); }}
           className="mt-4 px-6 py-2 bg-white/50 border border-[#E5D5D5] rounded-full text-[#826454] hover:bg-white transition-colors"
         >
           Play Again
         </button>
       )}
+    </div>
+  );
+};
+
+/* -------------------- Study History Tab -------------------- */
+interface StudyHistoryProps {
+  sessions: StudySession[];
+  onDeleteSession: (id: number) => void;
+}
+
+const StudyHistory: React.FC<StudyHistoryProps> = ({ sessions, onDeleteSession }) => {
+  const totalSeconds = sessions.reduce((sum, s) => sum + s.durationSeconds, 0);
+  const sessionCount = sessions.length;
+
+  // Totals map by date
+  const totalsByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    sessions.forEach((s) => {
+      map[s.date] = (map[s.date] || 0) + s.durationSeconds;
+    });
+    return map;
+  }, [sessions]);
+
+  // Streak (consecutive days with study, ending today or yesterday)
+  const streak = useMemo(() => {
+    let count = 0;
+    const cursor = new Date();
+    cursor.setHours(0, 0, 0, 0);
+    // Allow today to be empty without breaking streak (if today hasn't been studied yet)
+    const todayKey = todayISO();
+    if (!totalsByDate[todayKey]) cursor.setDate(cursor.getDate() - 1);
+    while (true) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+      if (totalsByDate[key]) {
+        count++;
+        cursor.setDate(cursor.getDate() - 1);
+      } else break;
+    }
+    return count;
+  }, [totalsByDate]);
+
+  // This week & today totals
+  const todayTotal = totalsByDate[todayISO()] || 0;
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 6);
+  weekStart.setHours(0, 0, 0, 0);
+  let weekTotal = 0;
+  Object.entries(totalsByDate).forEach(([date, secs]) => {
+    if (new Date(date + 'T00:00:00').getTime() >= weekStart.getTime()) weekTotal += secs;
+  });
+
+  // Heatmap — last ~5 weeks aligned to Sunday
+  const heatmapWeeks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(start.getDate() - 34);
+    start.setDate(start.getDate() - start.getDay()); // align to Sunday
+
+    const days: { date: string; minutes: number }[] = [];
+    const cursor = new Date(start);
+    while (cursor <= today) {
+      const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+      days.push({ date: key, minutes: Math.round((totalsByDate[key] || 0) / 60) });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    const weeks: typeof days[] = [];
+    for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+    return weeks;
+  }, [totalsByDate]);
+
+  const heatColor = (min: number) => {
+    if (min === 0) return '#E5D5D5';
+    if (min <= 15) return '#C9D6C0';
+    if (min <= 45) return '#9CA893';
+    if (min <= 90) return '#7A8A70';
+    if (min <= 180) return '#5C6B54';
+    return '#3F4C38';
+  };
+
+  const recent = [...sessions].sort((a, b) => b.startedAt - a.startedAt).slice(0, 20);
+
+  return (
+    <div className="w-full max-w-3xl mx-auto">
+      <h3 className="font-serif text-3xl text-[#633131] mb-6 text-center">Your Study Journey</h3>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <div className="bg-white/70 rounded-2xl p-4 border border-white shadow-sm text-center">
+          <Clock size={18} className="text-[#9CA893] mx-auto mb-1" />
+          <p className="font-sans text-[10px] uppercase tracking-widest text-[#826454]">Total</p>
+          <p className="font-serif text-xl text-[#633131] mt-1">{formatDuration(totalSeconds)}</p>
+        </div>
+        <div className="bg-white/70 rounded-2xl p-4 border border-white shadow-sm text-center">
+          <Flame size={18} className="text-[#D4A373] mx-auto mb-1" />
+          <p className="font-sans text-[10px] uppercase tracking-widest text-[#826454]">Streak</p>
+          <p className="font-serif text-xl text-[#633131] mt-1">{streak} {streak === 1 ? 'day' : 'days'}</p>
+        </div>
+        <div className="bg-white/70 rounded-2xl p-4 border border-white shadow-sm text-center">
+          <BarChart3 size={18} className="text-[#C69C9C] mx-auto mb-1" />
+          <p className="font-sans text-[10px] uppercase tracking-widest text-[#826454]">Today</p>
+          <p className="font-serif text-xl text-[#633131] mt-1">{formatDuration(todayTotal)}</p>
+        </div>
+        <div className="bg-white/70 rounded-2xl p-4 border border-white shadow-sm text-center">
+          <TrendingUp size={18} className="text-[#84A59D] mx-auto mb-1" />
+          <p className="font-sans text-[10px] uppercase tracking-widest text-[#826454]">This week</p>
+          <p className="font-serif text-xl text-[#633131] mt-1">{formatDuration(weekTotal)}</p>
+        </div>
+      </div>
+
+      {/* Heatmap */}
+      <div className="bg-white/60 rounded-2xl p-5 border border-white shadow-sm mb-8">
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-sans text-xs uppercase tracking-widest text-[#826454]">Last 5 weeks</p>
+          <p className="font-sans text-[10px] text-[#826454]">sessions: {sessionCount}</p>
+        </div>
+        <div className="flex flex-col gap-1">
+          {heatmapWeeks.map((week, wi) => (
+            <div key={wi} className="flex gap-1">
+              {week.map((day) => (
+                <div
+                  key={day.date}
+                  title={`${day.date} — ${day.minutes} min`}
+                  className="w-5 h-5 md:w-7 md:h-7 rounded-md"
+                  style={{ backgroundColor: heatColor(day.minutes) }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Recent sessions */}
+      <div className="bg-white/60 rounded-2xl p-5 border border-white shadow-sm">
+        <p className="font-sans text-xs uppercase tracking-widest text-[#826454] mb-4">Recent sessions</p>
+        {recent.length === 0 ? (
+          <p className="font-['Caveat'] text-2xl text-[#826454] text-center py-6 opacity-70">
+            Nothing yet. Start a focus session and it'll land here.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar pr-2">
+            {recent.map((s) => {
+              const when = new Date(s.startedAt);
+              const label = when.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+              const time = when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+              return (
+                <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-[#FDFBF7] border border-[#E5D5D5] group">
+                  <div>
+                    <p className="font-sans text-sm text-[#2C302E] font-medium">{formatDuration(s.durationSeconds)}</p>
+                    <p className="font-sans text-[10px] text-[#826454]">{label} · {time}</p>
+                  </div>
+                  <button
+                    onClick={() => onDeleteSession(s.id)}
+                    className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 hover:bg-white transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1156,14 +1275,17 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
   const [tasks, setTasks] = useCloudStorage<TaskItem[]>('sriju_tasks', [
     { id: 1, text: 'Drink a glass of water', done: false },
   ]);
+  const [sessions, setSessions] = useCloudStorage<StudySession[]>('sriju_study_sessions', []);
   const [newTask, setNewTask] = useState('');
-  const [activeTab, setActiveTab] = useState<'focus' | 'doodle' | 'pop' | 'game'>('focus');
+  const [activeTab, setActiveTab] = useState<'focus' | 'doodle' | 'pop' | 'game' | 'history'>('focus');
 
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const alarmFiredRef = useRef(false);
+  const sessionStartRef = useRef<number | null>(null);
 
+  // Timer tick
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (isRunning && timeLeft > 0) {
@@ -1172,21 +1294,32 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
       alarmFiredRef.current = true;
       setIsRunning(false);
       playTimerAlarm();
-      if (mode === 'focus') {
-        setMode('break');
-        setTimeLeft(5 * 60);
-      } else {
-        setMode('focus');
-        setTimeLeft(25 * 60);
-      }
-      setTimeout(() => {
-        alarmFiredRef.current = false;
-      }, 1500);
+      if (mode === 'focus') { setMode('break'); setTimeLeft(5 * 60); }
+      else { setMode('focus'); setTimeLeft(25 * 60); }
+      setTimeout(() => { alarmFiredRef.current = false; }, 1500);
+    }
+    return () => { if (interval) clearInterval(interval); };
+  }, [isRunning, timeLeft, mode]);
+
+  // Auto-track study sessions: log a session whenever focus mode stops (pause, mode change, unmount)
+  useEffect(() => {
+    if (isRunning && mode === 'focus') {
+      sessionStartRef.current = Date.now();
     }
     return () => {
-      if (interval) clearInterval(interval);
+      if (sessionStartRef.current !== null) {
+        const start = sessionStartRef.current;
+        sessionStartRef.current = null;
+        const durationSeconds = Math.round((Date.now() - start) / 1000);
+        if (durationSeconds >= 30) {
+          const d = new Date(start);
+          const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          setSessions((prev) => [...prev, { id: Date.now(), date, startedAt: start, durationSeconds }]);
+        }
+      }
     };
-  }, [isRunning, timeLeft, mode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, mode]);
 
   const toggleTask = (id: number) =>
     setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
@@ -1199,9 +1332,7 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
   };
 
   const formatTime = (secs: number) =>
-    `${Math.floor(secs / 60)
-      .toString()
-      .padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
+    `${Math.floor(secs / 60).toString().padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
 
   const switchMode = (newMode: 'focus' | 'break') => {
     setMode(newMode);
@@ -1209,6 +1340,8 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
     setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60);
     alarmFiredRef.current = false;
   };
+
+  const deleteSession = (id: number) => setSessions(sessions.filter((s) => s.id !== id));
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1228,57 +1361,46 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
   }, [activeTab]);
 
   const ambientOptions: { id: string; label: string; icon: LucideIcon; color: string }[] = [
-    { id: 'piano',  label: 'Piano',  icon: Music,     color: '#633131' },
-    { id: 'rain',   label: 'Rain',   icon: CloudRain, color: '#2C302E' },
-    { id: 'forest', label: 'Forest', icon: Trees,     color: '#9CA893' },
-    { id: 'lofi',   label: 'Lofi',   icon: Music,     color: '#C69C9C' },
-    { id: 'cafe',   label: 'Cafe',   icon: Coffee,    color: '#D4A373' },
-    { id: 'night',  label: 'Night',  icon: Moon,      color: '#633131' },
-    { id: 'ocean',  label: 'Ocean',  icon: Droplet,   color: '#84A59D' },
+    { id: 'piano', label: 'Piano', icon: Music, color: '#633131' },
+    { id: 'rain', label: 'Rain', icon: CloudRain, color: '#2C302E' },
+    { id: 'forest', label: 'Forest', icon: Trees, color: '#9CA893' },
+    { id: 'lofi', label: 'Lofi', icon: Music, color: '#C69C9C' },
+    { id: 'cafe', label: 'Cafe', icon: Coffee, color: '#D4A373' },
+    { id: 'night', label: 'Night', icon: Moon, color: '#633131' },
+    { id: 'ocean', label: 'Ocean', icon: Droplet, color: '#84A59D' },
+  ];
+
+  const tabs: { id: typeof activeTab; label: string; icon?: LucideIcon }[] = [
+    { id: 'focus', label: 'Focus' },
+    { id: 'history', label: 'History', icon: Clock },
+    { id: 'doodle', label: 'Doodle', icon: PenTool },
+    { id: 'pop', label: 'Bubble Wrap', icon: CircleDashed },
+    { id: 'game', label: 'Mini Game', icon: Gamepad2 },
   ];
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="max-w-6xl mx-auto px-4 py-8 relative z-10"
     >
       <div className="text-center mb-10">
         <h2 className="font-serif text-4xl md:text-5xl text-[#2C302E]">Study Desk</h2>
-        <div className="flex flex-wrap justify-center gap-4 mt-6">
-          <button
-            onClick={() => setActiveTab('focus')}
-            className={`px-4 py-2 rounded-full font-sans text-sm transition ${
-              activeTab === 'focus' ? 'bg-[#826454] text-white' : 'bg-white/50 text-[#826454]'
-            }`}
-          >
-            Focus
-          </button>
-          <button
-            onClick={() => setActiveTab('doodle')}
-            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
-              activeTab === 'doodle' ? 'bg-[#C69C9C] text-white' : 'bg-white/50 text-[#826454]'
-            }`}
-          >
-            <PenTool size={14} /> Doodle
-          </button>
-          <button
-            onClick={() => setActiveTab('pop')}
-            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
-              activeTab === 'pop' ? 'bg-[#9CA893] text-white' : 'bg-white/50 text-[#826454]'
-            }`}
-          >
-            <CircleDashed size={14} /> Bubble Wrap
-          </button>
-          <button
-            onClick={() => setActiveTab('game')}
-            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
-              activeTab === 'game' ? 'bg-[#D4A373] text-white' : 'bg-white/50 text-[#826454]'
-            }`}
-          >
-            <Gamepad2 size={14} /> Mini Game
-          </button>
+        <div className="flex flex-wrap justify-center gap-3 mt-6">
+          {tabs.map((t) => {
+            const Icon = t.icon;
+            const isActive = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
+                  isActive ? 'bg-[#826454] text-white shadow-md' : 'bg-white/50 text-[#826454] hover:bg-white'
+                }`}
+              >
+                {Icon && <Icon size={14} />} {t.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -1293,22 +1415,13 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
                 {tasks.map((task) => (
                   <motion.div
                     key={task.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
+                    initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
                     className="flex items-center gap-3 group"
                   >
-                    <button
-                      onClick={() => toggleTask(task.id)}
-                      className="text-[#9CA893] hover:text-[#633131]"
-                    >
+                    <button onClick={() => toggleTask(task.id)} className="text-[#9CA893] hover:text-[#633131]">
                       <CheckCircle size={20} className={task.done ? 'fill-[#9CA893]/20' : ''} />
                     </button>
-                    <span
-                      className={`flex-1 font-sans text-sm ${
-                        task.done ? 'line-through text-[#826454]/40' : 'text-[#2C302E]'
-                      }`}
-                    >
+                    <span className={`flex-1 font-sans text-sm ${task.done ? 'line-through text-[#826454]/40' : 'text-[#2C302E]'}`}>
                       {task.text}
                     </span>
                     <button
@@ -1329,10 +1442,7 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
                 placeholder="Add a task..."
                 className="flex-1 bg-white/50 border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none"
               />
-              <button
-                type="submit"
-                className="bg-[#C69C9C] text-white p-3 rounded-xl hover:bg-[#B58B8B]"
-              >
+              <button type="submit" className="bg-[#C69C9C] text-white p-3 rounded-xl hover:bg-[#B58B8B]">
                 <Plus size={20} />
               </button>
             </form>
@@ -1350,9 +1460,7 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
                     key={id}
                     onClick={() => setAmbientSound(id)}
                     className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all ${
-                      isActive
-                        ? 'bg-[#C69C9C] text-white shadow-md scale-[1.03]'
-                        : 'bg-white/60 hover:bg-white text-[#633131]'
+                      isActive ? 'bg-[#C69C9C] text-white shadow-md scale-[1.03]' : 'bg-white/60 hover:bg-white text-[#633131]'
                     }`}
                   >
                     <Icon size={18} style={{ color: isActive ? undefined : color }} />
@@ -1366,10 +1474,7 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
 
         <div
           className="lg:col-span-2 bg-[#F9F6F0]/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-[#E5D5D5] shadow-sm min-h-[500px] flex flex-col items-center justify-center relative overflow-hidden"
-          style={{
-            backgroundImage: 'radial-gradient(#E5D5D5 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-          }}
+          style={{ backgroundImage: 'radial-gradient(#E5D5D5 1px, transparent 1px)', backgroundSize: '20px 20px' }}
         >
           {activeTab === 'focus' && (
             <div className="text-center w-full">
@@ -1404,8 +1509,14 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
                 {isRunning ? 'Pause' : 'Start'}
               </button>
               <p className="font-sans text-xs text-[#826454] mt-4 opacity-70">
-                🔔 Alarm will chime when the timer hits zero.
+                🔔 Alarm will chime when the timer hits zero. Your focus time is saved automatically.
               </p>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="w-full overflow-y-auto max-h-[550px] custom-scrollbar py-2">
+              <StudyHistory sessions={sessions} onDeleteSession={deleteSession} />
             </div>
           )}
 
@@ -1441,14 +1552,8 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
                   ctx.lineTo(nativeEvent.offsetX, nativeEvent.offsetY);
                   ctx.stroke();
                 }}
-                onMouseUp={() => {
-                  canvasRef.current?.getContext('2d')?.closePath();
-                  setIsDrawing(false);
-                }}
-                onMouseLeave={() => {
-                  canvasRef.current?.getContext('2d')?.closePath();
-                  setIsDrawing(false);
-                }}
+                onMouseUp={() => { canvasRef.current?.getContext('2d')?.closePath(); setIsDrawing(false); }}
+                onMouseLeave={() => { canvasRef.current?.getContext('2d')?.closePath(); setIsDrawing(false); }}
                 className="w-full h-[400px] bg-white/50 border-2 border-dashed border-[#E5D5D5] rounded-xl"
               />
             </div>
@@ -1458,9 +1563,7 @@ const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound
             <div className="w-full h-full flex flex-col items-center">
               <h3 className="font-['Caveat'] text-3xl text-[#826454] mb-6">Pop to release stress!</h3>
               <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                {Array.from({ length: 42 }).map((_, i) => (
-                  <BubbleWrap key={i} />
-                ))}
+                {Array.from({ length: 42 }).map((_, i) => (<BubbleWrap key={i} />))}
               </div>
             </div>
           )}
@@ -1482,28 +1585,61 @@ const BubbleWrap: React.FC = () => {
         popped ? 'bg-transparent' : 'bg-white/80 cursor-pointer relative'
       }`}
     >
-      {!popped && (
-        <div className="w-2 h-2 bg-white rounded-full absolute top-2 left-2 opacity-60" />
-      )}
+      {!popped && <div className="w-2 h-2 bg-white rounded-full absolute top-2 left-2 opacity-60" />}
     </motion.button>
   );
 };
 
-/* -------------------- Finance Corner -------------------- */
+/* -------------------- Finance Corner (savings-first) -------------------- */
 const FinanceCorner: React.FC = () => {
-  const [budget, setBudget] = useCloudStorage<number>('sriju_budget_npr', 15000);
-  const [savingsGoal, setSavingsGoal] = useCloudStorage<number>('sriju_goal_npr', 5000);
+  const [goal, setGoal] = useCloudStorage<number>('sriju_goal_npr', 50000);
+  const [deposits, setDeposits] = useCloudStorage<SavingsDeposit[]>('sriju_deposits', []);
   const [expenses, setExpenses] = useCloudStorage<ExpenseItem[]>('sriju_expenses_npr', []);
 
+  const [activeTab, setActiveTab] = useState<'save' | 'spend'>('save');
+  const [newDepositAmount, setNewDepositAmount] = useState('');
+  const [newDepositNote, setNewDepositNote] = useState('');
   const [newExpName, setNewExpName] = useState('');
   const [newExpAmount, setNewExpAmount] = useState('');
-  const [isEditingSettings, setIsEditingSettings] = useState(false);
-  const [tempBudget, setTempBudget] = useState(budget);
-  const [tempGoal, setTempGoal] = useState(savingsGoal);
+  const [isEditingGoal, setIsEditingGoal] = useState(false);
+  const [tempGoal, setTempGoal] = useState(goal);
+  const [jarWobble, setJarWobble] = useState(false);
 
-  const spent = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-  const remaining = Math.max(0, budget - spent);
-  const fillPercentage = Math.min(100, (remaining / (savingsGoal || 1)) * 100) || 0;
+  const totalSaved = deposits.reduce((s, d) => s + d.amount, 0);
+  const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+  const progress = Math.min(100, (totalSaved / (goal || 1)) * 100);
+  const remaining = Math.max(0, goal - totalSaved);
+
+  const now = Date.now();
+  const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const weekTotal = deposits
+    .filter((d) => new Date(d.date + 'T00:00:00').getTime() >= weekAgo)
+    .reduce((s, d) => s + d.amount, 0);
+
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const monthTotal = deposits
+    .filter((d) => new Date(d.date + 'T00:00:00').getTime() >= monthStart.getTime())
+    .reduce((s, d) => s + d.amount, 0);
+
+  // Simple pace estimate
+  const dailyRate = weekTotal / 7;
+  const etaDays = dailyRate > 0 && remaining > 0 ? Math.ceil(remaining / dailyRate) : null;
+
+  const addDeposit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amt = parseFloat(newDepositAmount);
+    if (!amt || amt <= 0 || isNaN(amt)) return;
+    setDeposits([
+      { id: Date.now(), amount: amt, note: newDepositNote.trim() || 'Saved', date: todayISO() },
+      ...deposits,
+    ]);
+    setNewDepositAmount('');
+    setNewDepositNote('');
+    setJarWobble(true);
+    setTimeout(() => setJarWobble(false), 700);
+  };
 
   const addExpense = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1515,186 +1651,291 @@ const FinanceCorner: React.FC = () => {
     setNewExpName('');
     setNewExpAmount('');
   };
+
+  const removeDeposit = (id: number) => setDeposits(deposits.filter((d) => d.id !== id));
   const removeExpense = (id: number) => setExpenses(expenses.filter((e) => e.id !== id));
-  const saveSettings = () => {
-    if (tempBudget > 0) setBudget(tempBudget);
-    if (tempGoal > 0) setSavingsGoal(tempGoal);
-    setIsEditingSettings(false);
+
+  const saveGoal = () => {
+    if (tempGoal > 0) setGoal(tempGoal);
+    setIsEditingGoal(false);
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="max-w-5xl mx-auto px-4 py-12 relative z-10"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="max-w-6xl mx-auto px-4 py-12 relative z-10"
     >
       <div className="text-center mb-12">
-        <h2 className="font-serif text-4xl md:text-5xl text-[#2C302E] mb-4">The Money Jar</h2>
+        <div className="inline-flex items-center gap-3 mb-3">
+          <PiggyBank className="text-[#C69C9C]" size={32} />
+          <h2 className="font-serif text-4xl md:text-5xl text-[#2C302E]">Our Savings Jar</h2>
+        </div>
         <p className="font-sans text-[#826454] text-lg">
-          Little by little. Future Sriju is going to thank you.
+          Every rupee you save is a little love letter to your future self.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        <div className="lg:col-span-5 flex flex-col items-center justify-center bg-white/40 backdrop-blur-xl p-10 rounded-[3rem] border border-white/60 shadow-sm relative overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Jar + goal */}
+        <div className="lg:col-span-5 flex flex-col items-center bg-white/50 backdrop-blur-xl p-8 rounded-[3rem] border border-white/60 shadow-sm relative overflow-hidden">
+          <button
+            onClick={() => { setTempGoal(goal); setIsEditingGoal(true); }}
+            className="absolute top-5 right-5 p-2 text-[#826454] hover:bg-white/70 rounded-full"
+            aria-label="Edit goal"
+          >
+            <Edit2 size={18} />
+          </button>
+
           <AnimatePresence>
-            {isEditingSettings && (
+            {isEditingGoal && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="absolute inset-0 bg-white/95 z-20 flex flex-col items-center justify-center p-8 rounded-[3rem]"
               >
-                <h3 className="font-serif text-2xl mb-6 text-[#633131]">Set Your Targets (NPR)</h3>
-                <div className="space-y-4 w-full max-w-xs">
-                  <div>
-                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">
-                      Monthly Budget (Rs.)
-                    </label>
-                    <input
-                      type="number"
-                      value={tempBudget}
-                      onChange={(e) => setTempBudget(Number(e.target.value))}
-                      className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">
-                      Savings Goal (Rs.)
-                    </label>
-                    <input
-                      type="number"
-                      value={tempGoal}
-                      onChange={(e) => setTempGoal(Number(e.target.value))}
-                      className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none"
-                    />
-                  </div>
-                  <button
-                    onClick={saveSettings}
-                    className="w-full bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium"
-                  >
-                    Save Changes
+                <h3 className="font-serif text-2xl mb-6 text-[#633131]">Set Your Saving Goal</h3>
+                <div className="flex items-center bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 w-full max-w-xs mb-4">
+                  <span className="text-[#826454] text-sm mr-2">Rs.</span>
+                  <input
+                    type="number"
+                    value={tempGoal}
+                    onChange={(e) => setTempGoal(Number(e.target.value))}
+                    className="w-full bg-transparent py-3 font-serif text-xl outline-none"
+                  />
+                </div>
+                <div className="flex gap-3 w-full max-w-xs">
+                  <button onClick={() => setIsEditingGoal(false)} className="flex-1 py-3 rounded-xl font-sans text-sm text-[#826454] hover:bg-[#F0EBE1]">
+                    Cancel
+                  </button>
+                  <button onClick={saveGoal} className="flex-1 bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#87977E]">
+                    Save
                   </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-          <button
-            onClick={() => setIsEditingSettings(true)}
-            className="absolute top-6 right-6 p-2 text-[#826454] hover:bg-white/50 rounded-full z-10"
-          >
-            <Edit2 size={20} />
-          </button>
 
-          <div className="relative w-64 h-80 mb-8 mt-4">
-            <svg viewBox="0 0 100 150" className="w-full h-full drop-shadow-2xl relative z-10">
+          <p className="font-sans text-[10px] uppercase tracking-[0.25em] text-[#826454] mb-4">Goal</p>
+          <p className="font-serif text-3xl text-[#633131] mb-6">Rs. {goal.toLocaleString()}</p>
+
+          <motion.div
+            animate={jarWobble ? { rotate: [0, -6, 6, -3, 3, 0] } : {}}
+            transition={{ duration: 0.7 }}
+            className="relative w-56 h-72 mb-6"
+          >
+            <svg viewBox="0 0 100 150" className="w-full h-full drop-shadow-2xl">
               <path
                 d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z"
-                fill="rgba(255,255,255,0.4)"
+                fill="rgba(255,255,255,0.5)"
                 stroke="#C69C9C"
                 strokeWidth="2"
               />
               <rect x="25" y="5" width="50" height="10" rx="3" fill="#826454" />
-              <clipPath id="jar-clip">
-                <path d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z" />
-              </clipPath>
+              <defs>
+                <linearGradient id="fill-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#B5C7A8" />
+                  <stop offset="100%" stopColor="#7A8A70" />
+                </linearGradient>
+                <clipPath id="jar-clip">
+                  <path d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z" />
+                </clipPath>
+              </defs>
               <g clipPath="url(#jar-clip)">
                 <rect
                   x="0"
-                  y={150 - fillPercentage * 1.2}
+                  y={150 - (progress / 100) * 130 - 10}
                   width="100"
                   height="150"
-                  fill="#9CA893"
-                  opacity="0.85"
+                  fill="url(#fill-grad)"
+                  opacity="0.9"
                   className="transition-all duration-1000 ease-in-out"
                 />
               </g>
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-12 z-20">
-              <span className="font-serif text-[#633131] text-sm opacity-90 mb-1 bg-white/40 px-3 rounded-full backdrop-blur-sm">
-                Current Savings
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-14">
+              <span className="font-sans text-[10px] uppercase tracking-widest text-[#633131] bg-white/70 px-2 rounded-full">Saved</span>
+              <span className="font-sans font-bold text-[#2C302E] drop-shadow-md text-2xl mt-1">
+                Rs. {totalSaved.toLocaleString()}
               </span>
-              <span className="font-sans font-bold text-[#2C302E] drop-shadow-md text-3xl mt-1">
-                Rs. {remaining.toLocaleString()}
-              </span>
+              <span className="font-serif text-[#633131] text-xs mt-1">{progress.toFixed(0)}% of goal</span>
+            </div>
+          </motion.div>
+
+          {remaining > 0 ? (
+            <p className="font-['Caveat'] text-2xl text-[#633131] text-center">
+              Rs. {remaining.toLocaleString()} to go. You've got this, Tingu.
+            </p>
+          ) : (
+            <p className="font-['Caveat'] text-2xl text-[#633131] text-center">
+              You reached your goal. I'm so proud of you. ♡
+            </p>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 w-full mt-6">
+            <div className="bg-white/70 rounded-2xl py-3 text-center border border-white">
+              <p className="font-sans text-[9px] uppercase tracking-widest text-[#826454]">This week</p>
+              <p className="font-serif text-base text-[#633131] mt-1">Rs. {weekTotal.toLocaleString()}</p>
+            </div>
+            <div className="bg-white/70 rounded-2xl py-3 text-center border border-white">
+              <p className="font-sans text-[9px] uppercase tracking-widest text-[#826454]">This month</p>
+              <p className="font-serif text-base text-[#633131] mt-1">Rs. {monthTotal.toLocaleString()}</p>
+            </div>
+            <div className="bg-white/70 rounded-2xl py-3 text-center border border-white">
+              <p className="font-sans text-[9px] uppercase tracking-widest text-[#826454]">ETA</p>
+              <p className="font-serif text-base text-[#633131] mt-1">
+                {etaDays !== null ? `${etaDays}d` : '—'}
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-7 bg-white/70 backdrop-blur-xl p-8 rounded-[3rem] border border-[#E5D5D5] shadow-sm flex flex-col min-h-[500px]">
-          <div className="flex justify-between items-end mb-8 border-b border-[#E5D5D5] pb-6">
-            <h3 className="font-serif text-3xl text-[#633131]">Expense Log</h3>
-            <div className="text-right">
-              <span className="text-sm font-sans uppercase tracking-widest text-[#826454] block mb-1">
-                Total Spent
-              </span>
-              <span className="font-serif text-2xl text-[#2C302E]">
-                Rs. {spent.toLocaleString()}
-              </span>
-            </div>
-          </div>
-          <form
-            onSubmit={addExpense}
-            className="print-hide flex gap-3 mb-8 bg-[#FDFBF7] p-3 rounded-2xl border border-[#E5D5D5]"
-          >
-            <input
-              type="text"
-              value={newExpName}
-              onChange={(e) => setNewExpName(e.target.value)}
-              placeholder="What did you buy?"
-              className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none"
-            />
-            <div className="flex items-center bg-white border border-[#E5D5D5] rounded-xl px-4 w-32">
-              <span className="text-[#826454] text-sm">Rs.</span>
-              <input
-                type="number"
-                value={newExpAmount}
-                onChange={(e) => setNewExpAmount(e.target.value)}
-                placeholder="0"
-                className="w-full bg-transparent py-2 pl-2 font-sans text-base outline-none"
-              />
-            </div>
+        {/* Right: Tabs */}
+        <div className="lg:col-span-7 bg-white/70 backdrop-blur-xl p-6 md:p-8 rounded-[3rem] border border-[#E5D5D5] shadow-sm flex flex-col min-h-[560px]">
+          <div className="flex bg-[#F0EBE1] rounded-full p-1 mb-6 w-fit">
             <button
-              type="submit"
-              className="bg-[#C69C9C] text-white p-3 px-6 rounded-xl hover:bg-[#B58B8B]"
+              onClick={() => setActiveTab('save')}
+              className={`px-5 py-2 rounded-full font-sans text-sm transition ${
+                activeTab === 'save' ? 'bg-[#9CA893] text-white shadow-sm' : 'text-[#826454]'
+              }`}
             >
-              <Plus size={18} />
+              <span className="inline-flex items-center gap-2"><TrendingUp size={14} /> Savings</span>
             </button>
-          </form>
-          <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <AnimatePresence>
-              {expenses.map((exp) => (
-                <motion.div
-                  key={exp.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex justify-between items-center p-4 hover:bg-[#F9F6F0] bg-white/50 rounded-2xl group border border-transparent hover:border-[#E5D5D5]"
-                >
-                  <span className="font-sans text-lg text-[#2C302E]">{exp.name}</span>
-                  <div className="flex items-center gap-6">
-                    <span className="font-serif text-xl text-[#633131]">
-                      Rs. {exp.amount.toLocaleString()}
-                    </span>
-                    <button
-                      onClick={() => removeExpense(exp.id)}
-                      className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 transition-all"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+            <button
+              onClick={() => setActiveTab('spend')}
+              className={`px-5 py-2 rounded-full font-sans text-sm transition ${
+                activeTab === 'spend' ? 'bg-[#C69C9C] text-white shadow-sm' : 'text-[#826454]'
+              }`}
+            >
+              <span className="inline-flex items-center gap-2"><Coins size={14} /> Expenses</span>
+            </button>
           </div>
+
+          {activeTab === 'save' && (
+            <>
+              <form onSubmit={addDeposit} className="flex flex-col md:flex-row gap-3 mb-6 bg-[#FDFBF7] p-3 rounded-2xl border border-[#E5D5D5]">
+                <div className="flex items-center bg-white border border-[#E5D5D5] rounded-xl px-4 md:w-40">
+                  <span className="text-[#826454] text-sm mr-2">Rs.</span>
+                  <input
+                    type="number"
+                    value={newDepositAmount}
+                    onChange={(e) => setNewDepositAmount(e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-transparent py-2 font-sans text-base outline-none"
+                  />
+                </div>
+                <input
+                  type="text"
+                  value={newDepositNote}
+                  onChange={(e) => setNewDepositNote(e.target.value)}
+                  placeholder="Note (optional) — e.g. skipped takeout"
+                  className="flex-1 bg-transparent px-4 py-2 font-sans text-sm outline-none"
+                />
+                <button type="submit" className="bg-[#9CA893] text-white p-3 px-6 rounded-xl hover:bg-[#87977E] font-sans font-medium">
+                  <Plus size={18} />
+                </button>
+              </form>
+
+              <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <AnimatePresence>
+                  {deposits.length === 0 && (
+                    <motion.p
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                      className="font-['Caveat'] text-2xl text-[#826454] text-center py-10 opacity-70"
+                    >
+                      Nothing saved yet. Every rupee counts, Tingu.
+                    </motion.p>
+                  )}
+                  {deposits.map((d) => (
+                    <motion.div
+                      key={d.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex justify-between items-center p-4 hover:bg-[#F9F6F0] bg-white/60 rounded-2xl group border border-transparent hover:border-[#E5D5D5]"
+                    >
+                      <div>
+                        <p className="font-sans text-base text-[#2C302E]">{d.note}</p>
+                        <p className="font-sans text-[10px] text-[#826454] mt-0.5">{d.date}</p>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="font-serif text-xl text-[#7A8A70]">+ Rs. {d.amount.toLocaleString()}</span>
+                        <button
+                          onClick={() => removeDeposit(d.id)}
+                          className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'spend' && (
+            <>
+              <div className="flex justify-between items-end mb-6 border-b border-[#E5D5D5] pb-4">
+                <h3 className="font-serif text-2xl text-[#633131]">Expense Log</h3>
+                <div className="text-right">
+                  <span className="text-[10px] font-sans uppercase tracking-widest text-[#826454] block">Total spent</span>
+                  <span className="font-serif text-xl text-[#2C302E]">Rs. {totalSpent.toLocaleString()}</span>
+                </div>
+              </div>
+              <form onSubmit={addExpense} className="flex gap-3 mb-6 bg-[#FDFBF7] p-3 rounded-2xl border border-[#E5D5D5]">
+                <input
+                  type="text"
+                  value={newExpName}
+                  onChange={(e) => setNewExpName(e.target.value)}
+                  placeholder="What did you buy?"
+                  className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none"
+                />
+                <div className="flex items-center bg-white border border-[#E5D5D5] rounded-xl px-4 w-32">
+                  <span className="text-[#826454] text-sm">Rs.</span>
+                  <input
+                    type="number"
+                    value={newExpAmount}
+                    onChange={(e) => setNewExpAmount(e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-transparent py-2 pl-2 font-sans text-base outline-none"
+                  />
+                </div>
+                <button type="submit" className="bg-[#C69C9C] text-white p-3 px-6 rounded-xl hover:bg-[#B58B8B]">
+                  <Plus size={18} />
+                </button>
+              </form>
+              <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                <AnimatePresence>
+                  {expenses.map((exp) => (
+                    <motion.div
+                      key={exp.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="flex justify-between items-center p-4 hover:bg-[#F9F6F0] bg-white/60 rounded-2xl group border border-transparent hover:border-[#E5D5D5]"
+                    >
+                      <span className="font-sans text-base text-[#2C302E]">{exp.name}</span>
+                      <div className="flex items-center gap-6">
+                        <span className="font-serif text-xl text-[#633131]">Rs. {exp.amount.toLocaleString()}</span>
+                        <button
+                          onClick={() => removeExpense(exp.id)}
+                          className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 transition-all"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </motion.div>
   );
 };
 
-/* -------------------- Story Timeline (mixtape removed) -------------------- */
+/* -------------------- Story Timeline -------------------- */
 const StoryTimeline: React.FC = () => {
   const [bucketList, setBucketList] = useCloudStorage<BucketItem[]>('sriju_bucket', BUCKET_LIST);
   const toggleBucket = (id: number) =>
@@ -1713,27 +1954,19 @@ const StoryTimeline: React.FC = () => {
       ...customMemories,
       {
         id: Date.now(),
-        date:
-          memDate.trim() ||
-          new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        date: memDate.trim() || new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
         title: memTitle.trim(),
         text: memText.trim(),
       },
     ]);
-    setMemDate('');
-    setMemTitle('');
-    setMemText('');
-    setShowAddMemory(false);
+    setMemDate(''); setMemTitle(''); setMemText(''); setShowAddMemory(false);
   };
 
-  const removeCustomMemory = (id: number) =>
-    setCustomMemories(customMemories.filter((m) => m.id !== id));
+  const removeCustomMemory = (id: number) => setCustomMemories(customMemories.filter((m) => m.id !== id));
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="max-w-4xl mx-auto px-4 py-16 relative z-10"
     >
       <div className="text-center mb-24">
@@ -1755,13 +1988,9 @@ const StoryTimeline: React.FC = () => {
           >
             <div className="absolute -left-[11.5px] top-2 w-5 h-5 rounded-full bg-[#FDFBF7] border-[3px] border-[#C69C9C] group-hover:bg-[#C69C9C] group-hover:scale-150 transition-all duration-700" />
             <div className="bg-white/70 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] border border-[#E5D5D5] shadow-sm hover:shadow-md transition-all duration-500 hover:-translate-y-2">
-              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">
-                {item.date}
-              </span>
+              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">{item.date}</span>
               <h3 className="font-serif text-3xl text-[#633131] mb-5">{item.title}</h3>
-              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">
-                {item.text}
-              </p>
+              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">{item.text}</p>
             </div>
           </motion.div>
         ))}
@@ -1780,17 +2009,12 @@ const StoryTimeline: React.FC = () => {
               <button
                 onClick={() => removeCustomMemory(item.id)}
                 className="absolute top-6 right-6 p-2 rounded-full text-[#826454]/30 hover:text-red-500 hover:bg-white/60 transition-all opacity-0 group-hover:opacity-100"
-                aria-label="Remove this memory"
               >
                 <Trash2 size={16} />
               </button>
-              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">
-                {item.date}
-              </span>
+              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">{item.date}</span>
               <h3 className="font-serif text-3xl text-[#633131] mb-5">{item.title}</h3>
-              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">
-                {item.text}
-              </p>
+              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">{item.text}</p>
             </div>
           </motion.div>
         ))}
@@ -1809,57 +2033,28 @@ const StoryTimeline: React.FC = () => {
       <AnimatePresence>
         {showAddMemory && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
           >
             <motion.form
               onSubmit={addMemory}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
               className="bg-[#FDFBF7] w-full max-w-lg p-8 md:p-10 rounded-[2.5rem] border border-[#E5D5D5] shadow-2xl"
             >
               <h3 className="font-serif text-2xl text-[#633131] mb-6">Add a new memory</h3>
               <div className="space-y-4">
-                <input
-                  type="text"
-                  value={memDate}
-                  onChange={(e) => setMemDate(e.target.value)}
-                  placeholder="Date (optional — defaults to today)"
-                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
-                />
-                <input
-                  type="text"
-                  value={memTitle}
-                  onChange={(e) => setMemTitle(e.target.value)}
-                  placeholder="Title (e.g. 'Our first road trip')"
-                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
-                  required
-                />
-                <textarea
-                  value={memText}
-                  onChange={(e) => setMemText(e.target.value)}
-                  placeholder="What happened..."
-                  className="w-full h-28 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none resize-none focus:border-[#C69C9C]"
-                  required
-                />
+                <input type="text" value={memDate} onChange={(e) => setMemDate(e.target.value)} placeholder="Date (optional — defaults to today)"
+                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]" />
+                <input type="text" value={memTitle} onChange={(e) => setMemTitle(e.target.value)} placeholder="Title (e.g. 'Our first road trip')"
+                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]" required />
+                <textarea value={memText} onChange={(e) => setMemText(e.target.value)} placeholder="What happened..."
+                  className="w-full h-28 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none resize-none focus:border-[#C69C9C]" required />
               </div>
               <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowAddMemory(false)}
-                  className="flex-1 py-3 rounded-xl font-sans text-sm text-[#826454] hover:bg-[#F0EBE1] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#87977E] transition-colors"
-                >
-                  Save memory
-                </button>
+                <button type="button" onClick={() => setShowAddMemory(false)}
+                  className="flex-1 py-3 rounded-xl font-sans text-sm text-[#826454] hover:bg-[#F0EBE1] transition-colors">Cancel</button>
+                <button type="submit"
+                  className="flex-1 bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#87977E] transition-colors">Save memory</button>
               </div>
             </motion.form>
           </motion.div>
@@ -1867,9 +2062,7 @@ const StoryTimeline: React.FC = () => {
       </AnimatePresence>
 
       <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
+        initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
         className="max-w-2xl mx-auto bg-[#FDFBF7] p-8 md:p-10 rounded-[3rem] border border-[#E5D5D5] shadow-sm relative overflow-hidden"
       >
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#9CA893] rounded-full blur-[100px] opacity-10" />
@@ -1882,18 +2075,12 @@ const StoryTimeline: React.FC = () => {
               onClick={() => toggleBucket(item.id)}
               className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/60 cursor-pointer transition-colors border border-transparent hover:border-[#E5D5D5]"
             >
-              <div
-                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
-                  item.done ? 'bg-[#9CA893] border-[#9CA893]' : 'border-[#C69C9C]'
-                }`}
-              >
+              <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                item.done ? 'bg-[#9CA893] border-[#9CA893]' : 'border-[#C69C9C]'
+              }`}>
                 {item.done && <CheckCircle size={14} className="text-white" />}
               </div>
-              <span
-                className={`font-sans text-base ${
-                  item.done ? 'text-[#826454]/50 line-through' : 'text-[#4A4343]'
-                }`}
-              >
+              <span className={`font-sans text-base ${item.done ? 'text-[#826454]/50 line-through' : 'text-[#4A4343]'}`}>
                 {item.text}
               </span>
             </div>
@@ -1904,10 +2091,11 @@ const StoryTimeline: React.FC = () => {
   );
 };
 
-/* -------------------- Bucket List Section -------------------- */
+/* -------------------- Bucket List Section (sticky notes) -------------------- */
 const BucketListSection: React.FC = () => {
   const [bucketList, setBucketList] = useCloudStorage<BucketItem[]>('sriju_bucket', BUCKET_LIST);
   const [newItem, setNewItem] = useState('');
+  const [adding, setAdding] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
 
   const total = bucketList.length;
@@ -1936,6 +2124,7 @@ const BucketListSection: React.FC = () => {
     if (!newItem.trim()) return;
     setBucketList([...bucketList, { id: Date.now(), text: newItem.trim(), done: false }]);
     setNewItem('');
+    setAdding(false);
   };
 
   const removeItem = (id: number) => setBucketList(bucketList.filter((i) => i.id !== id));
@@ -1946,12 +2135,17 @@ const BucketListSection: React.FC = () => {
     }
   };
 
+  // Stable rotation + color per note, derived from id
+  const noteStyle = (id: number) => {
+    const color = STICKY_COLORS[id % STICKY_COLORS.length];
+    const rotation = ((id % 7) - 3) * 1.4;
+    return { color, rotation };
+  };
+
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="max-w-4xl mx-auto px-4 py-16 relative z-10"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="max-w-5xl mx-auto px-4 py-16 relative z-10"
     >
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-3 mb-4">
@@ -1961,15 +2155,14 @@ const BucketListSection: React.FC = () => {
           </h2>
         </div>
         <p className="font-sans text-[#826454] text-lg italic max-w-2xl mx-auto">
-          Every little dream we're going to chase together, Tingu. Check them off one by one.
+          Little dreams, pinned to a corkboard. Tap one to check it off.
         </p>
       </div>
 
-      <div className="bg-white/60 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-white/60 shadow-sm mb-8">
+      {/* Progress */}
+      <div className="max-w-2xl mx-auto bg-white/60 backdrop-blur-xl p-5 md:p-6 rounded-[2rem] border border-white/60 shadow-sm mb-10">
         <div className="flex justify-between items-end mb-3">
-          <span className="font-sans uppercase tracking-widest text-xs text-[#826454]">
-            Progress
-          </span>
+          <span className="font-sans uppercase tracking-widest text-xs text-[#826454]">Progress</span>
           <span className="font-serif text-2xl text-[#633131]">
             {done} <span className="text-[#826454] text-lg">/ {total}</span>
           </span>
@@ -1989,71 +2182,146 @@ const BucketListSection: React.FC = () => {
         )}
       </div>
 
-      <form
-        onSubmit={addItem}
-        className="print-hide flex gap-3 mb-8 bg-white/70 p-3 rounded-2xl border border-[#E5D5D5] shadow-sm"
+      {/* Corkboard */}
+      <div
+        className="rounded-[2rem] p-6 md:p-10 shadow-inner border-[6px] border-[#8B6F47]"
+        style={{
+          background:
+            'radial-gradient(circle at 20% 30%, rgba(0,0,0,0.05) 0%, transparent 40%), radial-gradient(circle at 80% 70%, rgba(0,0,0,0.05) 0%, transparent 40%), linear-gradient(135deg, #B08A5E 0%, #9A7850 100%)',
+          backgroundBlendMode: 'multiply',
+        }}
       >
-        <input
-          type="text"
-          value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
-          placeholder="Add a new dream..."
-          className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none"
-        />
-        <button
-          type="submit"
-          className="bg-[#C69C9C] text-white px-5 rounded-xl hover:bg-[#B58B8B] flex items-center gap-2 font-sans"
-        >
-          <Plus size={18} /> Add
-        </button>
-      </form>
-
-      <div className="space-y-3">
-        <AnimatePresence>
-          {bucketList.map((item, idx) => (
-            <motion.div
-              key={item.id}
-              layout
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -30 }}
-              transition={{ delay: idx * 0.02 }}
-              className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all cursor-pointer ${
-                item.done
-                  ? 'bg-[#E8ECE4]/60 border-[#9CA893]/40'
-                  : 'bg-white/70 border-[#E5D5D5] hover:border-[#C69C9C] hover:shadow-md'
-              }`}
-              onClick={() => toggleItem(item.id)}
-            >
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-5 md:gap-6">
+          {bucketList.map((item) => {
+            const { color, rotation } = noteStyle(item.id);
+            return (
               <motion.div
-                whileTap={{ scale: 0.8 }}
-                className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
-                  item.done
-                    ? 'bg-[#9CA893] border-[#9CA893]'
-                    : 'border-[#C69C9C] group-hover:bg-[#F5E6E6]'
-                }`}
-              >
-                {item.done && <CheckCircle size={16} className="text-white" />}
-              </motion.div>
-              <span
-                className={`flex-1 font-sans text-lg transition-all ${
-                  item.done ? 'line-through text-[#826454]/60' : 'text-[#2C302E]'
-                }`}
-              >
-                {item.text}
-              </span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeItem(item.id);
+                key={item.id}
+                initial={false}
+                animate={{ rotate: rotation, y: 0, scale: 1 }}
+                whileHover={{ rotate: 0, y: -8, scale: 1.05, zIndex: 20 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                onClick={() => toggleItem(item.id)}
+                className="relative aspect-square p-4 md:p-5 cursor-pointer shadow-[3px_5px_12px_rgba(0,0,0,0.25)] rounded-sm group select-none"
+                style={{
+                  backgroundColor: color.bg,
+                  backgroundImage:
+                    'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 30%, rgba(0,0,0,0.04) 100%)',
                 }}
-                className="opacity-0 group-hover:opacity-100 p-2 rounded-full text-[#826454]/40 hover:text-red-500 hover:bg-white transition-all"
               >
-                <Trash2 size={16} />
+                {/* Pin */}
+                <div
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full shadow-md"
+                  style={{
+                    background: `radial-gradient(circle at 30% 30%, #fff 0%, ${color.pin} 45%, rgba(0,0,0,0.4) 100%)`,
+                  }}
+                />
+
+                {/* Text */}
+                <p
+                  className={`font-['Caveat'] text-xl md:text-2xl leading-tight pr-5 pt-1 break-words transition-all ${
+                    item.done ? 'line-through text-[#633131]/50' : 'text-[#3A3020]'
+                  }`}
+                  style={{ fontFamily: "'Caveat', cursive" }}
+                >
+                  {item.text}
+                </p>
+
+                {/* Delete */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                  className="absolute top-1 right-1 p-1 rounded-full text-[#633131]/30 hover:text-red-600 hover:bg-white/40 transition-all opacity-0 group-hover:opacity-100"
+                  aria-label="Remove note"
+                >
+                  <X size={12} />
+                </button>
+
+                {/* DONE stamp overlay */}
+                {item.done && (
+                  <motion.div
+                    initial={{ scale: 1.5, opacity: 0, rotate: -20 }}
+                    animate={{ scale: 1, opacity: 1, rotate: -12 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 15 }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                  >
+                    <span
+                      className="font-bold text-2xl md:text-3xl tracking-wider px-3 py-1 rounded"
+                      style={{
+                        color: '#C0392B',
+                        border: '3px solid #C0392B',
+                        transform: 'rotate(-12deg)',
+                        fontFamily: "'Inter', sans-serif",
+                        opacity: 0.85,
+                      }}
+                    >
+                      DONE ♡
+                    </span>
+                  </motion.div>
+                )}
+              </motion.div>
+            );
+          })}
+
+          {/* Add new note */}
+          <motion.div
+            initial={false}
+            animate={{ rotate: adding ? 0 : 2 }}
+            whileHover={{ rotate: 0, scale: 1.03 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+            className="relative aspect-square p-4 md:p-5 rounded-sm shadow-[3px_5px_12px_rgba(0,0,0,0.2)]"
+            style={{
+              backgroundColor: adding ? '#FFFDF0' : 'rgba(255,255,255,0.15)',
+              border: '2px dashed rgba(255,255,255,0.6)',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <div
+              className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full shadow-md"
+              style={{ background: 'radial-gradient(circle at 30% 30%, #fff 0%, #D4A373 45%, rgba(0,0,0,0.4) 100%)' }}
+            />
+            {adding ? (
+              <form onSubmit={addItem} className="h-full flex flex-col">
+                <textarea
+                  autoFocus
+                  value={newItem}
+                  onChange={(e) => setNewItem(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      addItem(e as any);
+                    }
+                    if (e.key === 'Escape') { setAdding(false); setNewItem(''); }
+                  }}
+                  placeholder="A new little dream..."
+                  className="flex-1 bg-transparent resize-none outline-none font-['Caveat'] text-xl text-[#3A3020] placeholder-[#826454]/50"
+                />
+                <div className="flex justify-end gap-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setAdding(false); setNewItem(''); }}
+                    className="p-1.5 rounded-full text-[#826454] hover:bg-black/5"
+                  >
+                    <X size={14} />
+                  </button>
+                  <button
+                    type="submit"
+                    className="p-1.5 rounded-full bg-[#9CA893] text-white hover:bg-[#87977E]"
+                  >
+                    <CheckCircle size={14} />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button
+                onClick={() => setAdding(true)}
+                className="w-full h-full flex flex-col items-center justify-center text-white/90 hover:text-white transition-colors"
+              >
+                <Plus size={36} strokeWidth={1.5} />
+                <span className="font-['Caveat'] text-xl mt-1">Add a dream</span>
               </button>
-            </motion.div>
-          ))}
-        </AnimatePresence>
+            )}
+          </motion.div>
+        </div>
       </div>
 
       {bucketList.length > 0 && (
@@ -2062,7 +2330,7 @@ const BucketListSection: React.FC = () => {
             onClick={resetAll}
             className="font-sans text-sm text-[#826454] hover:text-[#633131] underline underline-offset-4"
           >
-            Reset checkboxes
+            Reset all notes
           </button>
         </div>
       )}
@@ -2070,9 +2338,7 @@ const BucketListSection: React.FC = () => {
       <AnimatePresence>
         {celebrate && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[150] flex items-center justify-center pointer-events-none"
           >
             <motion.div
@@ -2083,9 +2349,7 @@ const BucketListSection: React.FC = () => {
               className="flex flex-col items-center"
             >
               <PartyPopper size={120} className="text-[#C69C9C] drop-shadow-2xl" />
-              <p className="font-['Caveat'] text-5xl text-[#633131] mt-4 drop-shadow-lg">
-                Yay!
-              </p>
+              <p className="font-['Caveat'] text-5xl text-[#633131] mt-4 drop-shadow-lg">Yay!</p>
             </motion.div>
           </motion.div>
         )}
@@ -2097,14 +2361,9 @@ const BucketListSection: React.FC = () => {
 /* -------------------- Letter Section -------------------- */
 const LetterSection: React.FC = () => {
   const [activeEnvelope, setActiveEnvelope] = useState<OpenWhenLetter | null>(null);
-
   const [diaryEntries, setDiaryEntries] = useCloudStorage<DiaryEntry[]>('sriju_diary', []);
   const [newEntry, setNewEntry] = useState('');
-  const todayStr = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
+  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const saveDiary = () => {
     if (!newEntry.trim()) return;
@@ -2114,73 +2373,46 @@ const LetterSection: React.FC = () => {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="max-w-5xl mx-auto px-4 py-16 flex flex-col items-center relative z-10"
     >
       <motion.div
-        initial={{ rotateX: 10, y: 50 }}
-        animate={{ rotateX: 0, y: 0 }}
+        initial={{ rotateX: 10, y: 50 }} animate={{ rotateX: 0, y: 0 }}
         transition={{ duration: 1.5, type: 'spring' }}
         className="bg-[#FDFBF7] p-12 md:p-20 rounded-lg shadow-md border border-[#E5D5D5] relative w-full max-w-3xl transform origin-top bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] mb-20"
       >
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#D4C6C6] via-[#C69C9C] to-[#9CA893] rounded-t-lg opacity-30" />
-        <h2 className="font-serif text-4xl text-[#2C302E] mb-12 border-b-2 border-[#E5D5D5]/50 pb-6 inline-block">
-          For Tingu,
-        </h2>
+        <h2 className="font-serif text-4xl text-[#2C302E] mb-12 border-b-2 border-[#E5D5D5]/50 pb-6 inline-block">For Tingu,</h2>
         <div className="font-serif text-[#4A4343] space-y-10 leading-[2.5] text-xl md:text-2xl">
           <p>I know this really doesn't feel like much.</p>
-          <p>
-            I know we have grown really, really far away from each other for this to feel like home
-            again.
-          </p>
+          <p>I know we have grown really, really far away from each other for this to feel like home again.</p>
           <p>But trust me, Sriju...</p>
-          <p>
-            when you come back to the same place every day, it'll one day feel like home again.
-          </p>
-          <p className="font-bold text-[#633131] text-3xl italic mt-16 drop-shadow-sm">
-            And you are my home.
-          </p>
+          <p>when you come back to the same place every day, it'll one day feel like home again.</p>
+          <p className="font-bold text-[#633131] text-3xl italic mt-16 drop-shadow-sm">And you are my home.</p>
         </div>
         <div className="mt-24 text-right">
-          <p className="font-['Caveat'] text-5xl text-[#2C302E] rotate-[-5deg] inline-block pr-8">
-            — Jigar
-          </p>
+          <p className="font-['Caveat'] text-5xl text-[#2C302E] rotate-[-5deg] inline-block pr-8">— Jigar</p>
         </div>
       </motion.div>
 
       <div className="w-full max-w-4xl mx-auto mb-20 bg-white/50 backdrop-blur-md p-10 rounded-[3rem] border border-white shadow-sm flex flex-col md:flex-row gap-10">
         <div className="md:w-1/2 flex flex-col">
           <h2 className="font-serif text-3xl text-[#2C302E] mb-4">Dear Jigar...</h2>
-          <p className="font-sans text-[#826454] mb-6">
-            Write back to me, or just write out your thoughts. It stays safely on your device.
-          </p>
-          <p className="font-sans text-xs uppercase tracking-widest text-[#9CA893] font-bold mb-2">
-            {todayStr}
-          </p>
+          <p className="font-sans text-[#826454] mb-6">Write back to me, or just write out your thoughts. It stays safely on your device.</p>
+          <p className="font-sans text-xs uppercase tracking-widest text-[#9CA893] font-bold mb-2">{todayStr}</p>
           <textarea
             value={newEntry}
             onChange={(e) => setNewEntry(e.target.value)}
             className="w-full h-40 bg-[#FDFBF7] border border-[#E5D5D5] rounded-2xl p-4 font-sans text-base outline-none resize-none focus:border-[#C69C9C]"
             placeholder="Today I felt..."
           />
-          <button
-            onClick={saveDiary}
-            className="mt-4 bg-[#826454] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#633131] transition-colors"
-          >
-            Save Entry
-          </button>
+          <button onClick={saveDiary} className="mt-4 bg-[#826454] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#633131] transition-colors">Save Entry</button>
         </div>
         <div className="md:w-1/2 overflow-y-auto max-h-[400px] custom-scrollbar pr-4 space-y-4">
           {diaryEntries.map((entry) => (
             <div key={entry.id} className="bg-white/80 p-5 rounded-2xl border border-[#E5D5D5]">
-              <p className="font-sans text-xs uppercase tracking-widest text-[#C69C9C] font-bold mb-3 border-b border-[#E5D5D5] pb-2">
-                {entry.date}
-              </p>
-              <p className="font-serif text-[#4A4343] leading-relaxed whitespace-pre-wrap">
-                {entry.text}
-              </p>
+              <p className="font-sans text-xs uppercase tracking-widest text-[#C69C9C] font-bold mb-3 border-b border-[#E5D5D5] pb-2">{entry.date}</p>
+              <p className="font-serif text-[#4A4343] leading-relaxed whitespace-pre-wrap">{entry.text}</p>
             </div>
           ))}
         </div>
@@ -2209,29 +2441,16 @@ const LetterSection: React.FC = () => {
       <AnimatePresence>
         {activeEnvelope && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
           >
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
               className="bg-[#FDFBF7] p-10 md:p-14 rounded-lg max-w-lg w-full shadow-2xl border border-[#E5D5D5] relative text-center bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"
             >
-              <button
-                onClick={() => setActiveEnvelope(null)}
-                className="absolute top-6 right-6 text-[#826454] hover:text-[#2C302E]"
-              >
-                Close
-              </button>
-              <h3 className="font-serif text-2xl text-[#633131] mb-8 border-b border-[#E5D5D5] pb-4">
-                {activeEnvelope.title}
-              </h3>
-              <p className="font-serif text-[#4A4343] text-lg md:text-xl leading-relaxed">
-                {activeEnvelope.msg}
-              </p>
+              <button onClick={() => setActiveEnvelope(null)} className="absolute top-6 right-6 text-[#826454] hover:text-[#2C302E]">Close</button>
+              <h3 className="font-serif text-2xl text-[#633131] mb-8 border-b border-[#E5D5D5] pb-4">{activeEnvelope.title}</h3>
+              <p className="font-serif text-[#4A4343] text-lg md:text-xl leading-relaxed">{activeEnvelope.msg}</p>
               <p className="font-['Caveat'] text-3xl text-[#2C302E] mt-10 text-right">— Jigar</p>
             </motion.div>
           </motion.div>
@@ -2241,7 +2460,7 @@ const LetterSection: React.FC = () => {
   );
 };
 
-/* -------------------- Mixtape Panel (slide-in drawer) -------------------- */
+/* -------------------- Mixtape Panel -------------------- */
 interface MixtapePanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -2251,22 +2470,9 @@ interface MixtapePanelProps {
   setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const MixtapePanel: React.FC<MixtapePanelProps> = ({
-  isOpen,
-  onClose,
-  nowPlaying,
-  setNowPlaying,
-  isPlaying,
-  setIsPlaying,
-}) => {
+const MixtapePanel: React.FC<MixtapePanelProps> = ({ isOpen, onClose, nowPlaying, setNowPlaying, isPlaying, setIsPlaying }) => {
   const [mixtape, setMixtape] = useCloudStorage<MixtapeSong[]>('sriju_mixtape', [
-    {
-      id: 1,
-      title: 'Tum Se Hi',
-      artist: 'Mohit Chauhan',
-      note: 'The song that always plays when I think of you.',
-      youtubeId: undefined,
-    },
+    { id: 1, title: 'Tum Se Hi', artist: 'Mohit Chauhan', note: 'The song that always plays when I think of you.', youtubeId: undefined },
   ]);
   const [newSongTitle, setNewSongTitle] = useState('');
   const [newSongNote, setNewSongNote] = useState('');
@@ -2277,14 +2483,9 @@ const MixtapePanel: React.FC<MixtapePanelProps> = ({
 
   const playSong = (song: MixtapeSong) => {
     if (song.youtubeId) {
-      if (isCurrentSong(song)) {
-        setIsPlaying((p) => !p);
-        return;
-      }
+      if (isCurrentSong(song)) { setIsPlaying((p) => !p); return; }
       setNowPlaying({
-        kind: 'youtube',
-        videoId: song.youtubeId,
-        label: song.title,
+        kind: 'youtube', videoId: song.youtubeId, label: song.title,
         sublabel: song.artist && song.artist !== 'Us' ? song.artist : 'Our mixtape',
       });
       setIsPlaying(true);
@@ -2292,16 +2493,8 @@ const MixtapePanel: React.FC<MixtapePanelProps> = ({
     }
     if (song.audioUrl) {
       const isCurrent = nowPlaying?.kind === 'file' && nowPlaying.url === song.audioUrl;
-      if (isCurrent) {
-        setIsPlaying((p) => !p);
-        return;
-      }
-      setNowPlaying({
-        kind: 'file',
-        url: song.audioUrl,
-        label: song.title,
-        sublabel: 'Our mixtape',
-      });
+      if (isCurrent) { setIsPlaying((p) => !p); return; }
+      setNowPlaying({ kind: 'file', url: song.audioUrl, label: song.title, sublabel: 'Our mixtape' });
       setIsPlaying(true);
     }
   };
@@ -2313,17 +2506,12 @@ const MixtapePanel: React.FC<MixtapePanelProps> = ({
     setMixtape([
       ...mixtape,
       {
-        id: Date.now(),
-        title: newSongTitle,
-        artist: 'Us',
-        note: newSongNote,
+        id: Date.now(), title: newSongTitle, artist: 'Us', note: newSongNote,
         youtubeId: ytId || undefined,
         audioUrl: !ytId && newSongLink.trim() ? newSongLink.trim() : undefined,
       },
     ]);
-    setNewSongTitle('');
-    setNewSongNote('');
-    setNewSongLink('');
+    setNewSongTitle(''); setNewSongNote(''); setNewSongLink('');
   };
 
   const removeSong = (id: number) => setMixtape(mixtape.filter((s) => s.id !== id));
@@ -2333,82 +2521,50 @@ const MixtapePanel: React.FC<MixtapePanelProps> = ({
       {isOpen && (
         <>
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]"
           />
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             className="fixed top-0 right-0 h-full w-full max-w-md bg-[#2C302E] z-[115] shadow-2xl border-l border-[#4A4343] overflow-hidden flex flex-col"
           >
             <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: noiseSvg }} />
             <div className="relative z-10 flex flex-col h-full text-[#FDFBF7]">
-              {/* Header */}
               <div className="flex items-center justify-between p-6 md:p-8 border-b border-white/10">
                 <div>
-                  <h2 className="font-serif text-3xl flex items-center gap-3">
-                    <Music className="text-[#C69C9C]" /> Our Mixtape
-                  </h2>
-                  <p className="font-sans text-[#A3B18A] text-xs mt-1">
-                    Songs that belong to us. Tap play — it plays in the corner.
-                  </p>
+                  <h2 className="font-serif text-3xl flex items-center gap-3"><Music className="text-[#C69C9C]" /> Our Mixtape</h2>
+                  <p className="font-sans text-[#A3B18A] text-xs mt-1">Songs that belong to us. Tap play — it plays in the corner.</p>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
-                  aria-label="Close mixtape"
-                >
+                <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition-colors" aria-label="Close mixtape">
                   <X size={22} />
                 </button>
               </div>
 
-              {/* Song list */}
               <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-4">
                 {mixtape.length === 0 && (
-                  <p className="font-['Caveat'] text-2xl text-[#C69C9C] text-center mt-8 opacity-80">
-                    No songs yet. Add your first one below.
-                  </p>
+                  <p className="font-['Caveat'] text-2xl text-[#C69C9C] text-center mt-8 opacity-80">No songs yet. Add your first one below.</p>
                 )}
                 {mixtape.map((song) => (
-                  <div
-                    key={song.id}
-                    className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors group"
-                  >
+                  <div key={song.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors group">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-sans font-bold text-lg text-white truncate">{song.title}</p>
                         {song.artist && song.artist !== 'Us' && (
                           <p className="font-sans text-xs text-[#A3B18A] mt-0.5">{song.artist}</p>
                         )}
-                        <p className="font-['Caveat'] text-xl text-[#C69C9C] mt-2 opacity-90">
-                          "{song.note}"
-                        </p>
+                        <p className="font-['Caveat'] text-xl text-[#C69C9C] mt-2 opacity-90">"{song.note}"</p>
                       </div>
                       <div className="flex flex-col items-end gap-2 flex-shrink-0">
                         {(song.youtubeId || song.audioUrl) && (
                           <button
                             onClick={() => playSong(song)}
                             className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
-                              isCurrentSong(song) && isPlaying
-                                ? 'bg-[#9CA893] text-white'
-                                : 'bg-[#C69C9C] text-white hover:bg-[#B58B8B]'
+                              isCurrentSong(song) && isPlaying ? 'bg-[#9CA893] text-white' : 'bg-[#C69C9C] text-white hover:bg-[#B58B8B]'
                             }`}
-                            aria-label={
-                              isCurrentSong(song) && isPlaying
-                                ? `Pause ${song.title}`
-                                : `Play ${song.title}`
-                            }
                           >
-                            {isCurrentSong(song) && isPlaying ? (
-                              <Pause size={14} fill="currentColor" />
-                            ) : (
-                              <Play size={14} fill="currentColor" className="ml-0.5" />
-                            )}
+                            {isCurrentSong(song) && isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
                           </button>
                         )}
                         <button
@@ -2429,34 +2585,15 @@ const MixtapePanel: React.FC<MixtapePanelProps> = ({
                 ))}
               </div>
 
-              {/* Add form */}
               <div className="border-t border-white/10 p-6 md:p-8">
                 <form onSubmit={addSong} className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    value={newSongTitle}
-                    onChange={(e) => setNewSongTitle(e.target.value)}
-                    placeholder="Song name..."
-                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
-                  />
-                  <input
-                    type="text"
-                    value={newSongNote}
-                    onChange={(e) => setNewSongNote(e.target.value)}
-                    placeholder="Why is it our song?"
-                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
-                  />
-                  <input
-                    type="text"
-                    value={newSongLink}
-                    onChange={(e) => setNewSongLink(e.target.value)}
-                    placeholder="YouTube link or direct audio URL (optional)"
-                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
-                  />
-                  <button
-                    type="submit"
-                    className="bg-[#C69C9C] text-white py-2 rounded-xl mt-2 font-sans font-medium hover:bg-[#B58B8B] transition-colors"
-                  >
+                  <input type="text" value={newSongTitle} onChange={(e) => setNewSongTitle(e.target.value)} placeholder="Song name..."
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40" />
+                  <input type="text" value={newSongNote} onChange={(e) => setNewSongNote(e.target.value)} placeholder="Why is it our song?"
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40" />
+                  <input type="text" value={newSongLink} onChange={(e) => setNewSongLink(e.target.value)} placeholder="YouTube link or direct audio URL (optional)"
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40" />
+                  <button type="submit" className="bg-[#C69C9C] text-white py-2 rounded-xl mt-2 font-sans font-medium hover:bg-[#B58B8B] transition-colors">
                     Add to Tape
                   </button>
                 </form>
@@ -2479,14 +2616,7 @@ interface AudioPlayerProps {
   setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({
-  activeSection,
-  ambientSound,
-  nowPlaying,
-  setNowPlaying,
-  isPlaying,
-  setIsPlaying,
-}) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({ activeSection, ambientSound, nowPlaying, setNowPlaying, isPlaying, setIsPlaying }) => {
   const [customTrack, setCustomTrack] = useState<{ url: string; name: string } | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const ytHostRef = useRef<HTMLDivElement>(null);
@@ -2494,14 +2624,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPlayingRef = useRef(isPlaying);
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
+  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
   const source: NowPlaying = useMemo(() => {
     if (nowPlaying) return nowPlaying;
-    if (customTrack)
-      return { kind: 'file', url: customTrack.url, label: customTrack.name, sublabel: 'Your upload' };
+    if (customTrack) return { kind: 'file', url: customTrack.url, label: customTrack.name, sublabel: 'Your upload' };
     if (activeSection === 'study') {
       const track = STUDY_TRACKS[ambientSound] || STUDY_TRACKS.piano;
       return { kind: 'file', url: track.url, label: track.label, sublabel: 'Zen sounds' };
@@ -2523,46 +2650,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           if (!ytPlayerRef.current) {
             ytPlayerRef.current = new YT.Player(ytHostRef.current, {
               videoId: source.videoId,
-              playerVars: {
-                autoplay: 0,
-                controls: 0,
-                disablekb: 1,
-                playsinline: 1,
-                rel: 0,
-                modestbranding: 1,
-              },
+              playerVars: { autoplay: 0, controls: 0, disablekb: 1, playsinline: 1, rel: 0, modestbranding: 1 },
               events: {
-                onReady: (e: any) => {
-                  if (isPlayingRef.current) e.target.playVideo();
-                },
+                onReady: (e: any) => { if (isPlayingRef.current) e.target.playVideo(); },
               },
             });
           } else {
             ytPlayerRef.current.loadVideoById(source.videoId);
             if (!isPlayingRef.current) {
               window.setTimeout(() => {
-                try {
-                  ytPlayerRef.current?.pauseVideo();
-                } catch {
-                  /* noop */
-                }
+                try { ytPlayerRef.current?.pauseVideo(); } catch { /* noop */ }
               }, 400);
             }
           }
         })
-        .catch(() => {
-          /* offline — nothing to do */
-        });
-      return () => {
-        cancelled = true;
-      };
+        .catch(() => { /* offline */ });
+      return () => { cancelled = true; };
     }
 
-    try {
-      ytPlayerRef.current?.stopVideo?.();
-    } catch {
-      /* noop */
-    }
+    try { ytPlayerRef.current?.stopVideo?.(); } catch { /* noop */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceKey]);
 
@@ -2576,7 +2682,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
     const audio = audioRef.current;
     if (!audio) return;
-    if (isPlaying) audio.play().catch(() => { /* needs a user gesture */ });
+    if (isPlaying) audio.play().catch(() => { /* needs user gesture */ });
     else audio.pause();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPlaying, sourceKey]);
@@ -2600,10 +2706,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     setIsPlaying(false);
   };
 
-  const stopMixtapeSong = () => {
-    setNowPlaying(null);
-    setIsPlaying(false);
-  };
+  const stopMixtapeSong = () => { setNowPlaying(null); setIsPlaying(false); };
 
   return (
     <div className="fixed top-8 left-8 md:left-auto md:right-8 z-[80] bg-white/60 backdrop-blur-xl p-2 rounded-full shadow-sm border border-[#E5D5D5] flex items-center gap-2 md:gap-3 pr-3 md:pr-5 group hover:bg-white/90 transition-colors max-w-[92vw]">
@@ -2618,17 +2721,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         className="p-3 md:p-4 bg-[#F5E6E6] rounded-full text-[#633131] hover:bg-[#C69C9C] hover:text-white transition-colors flex-shrink-0"
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? (
-          <Pause size={18} fill="currentColor" />
-        ) : (
-          <Play size={18} fill="currentColor" className="ml-1" />
-        )}
+        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
       </button>
 
       <div className="hidden md:flex flex-col min-w-[100px] max-w-[170px]">
-        <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-[#826454] font-bold truncate">
-          {source.label}
-        </span>
+        <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-[#826454] font-bold truncate">{source.label}</span>
         <span className="text-[10px] font-sans text-[#826454]/70 mt-0.5 truncate">
           {source.kind === 'youtube'
             ? `${isPlaying ? 'Playing' : 'Paused'} · ${source.sublabel || 'YouTube'}`
@@ -2636,18 +2733,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         </span>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="audio/*"
-        onChange={handleUpload}
-        className="hidden"
-      />
+      <input ref={fileInputRef} type="file" accept="audio/*" onChange={handleUpload} className="hidden" />
       <button
         onClick={() => fileInputRef.current?.click()}
         className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-[#C69C9C] hover:text-white transition-colors flex-shrink-0"
         title="Upload your own MP3"
-        aria-label="Upload custom track"
       >
         <Upload size={16} />
       </button>
@@ -2657,7 +2747,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           onClick={clearCustom}
           className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-red-400 hover:text-white transition-colors flex-shrink-0"
           title="Remove custom track"
-          aria-label="Remove custom track"
         >
           <Trash2 size={14} />
         </button>
@@ -2668,7 +2757,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           onClick={stopMixtapeSong}
           className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-red-400 hover:text-white transition-colors flex-shrink-0"
           title="Stop this song"
-          aria-label="Stop this song"
         >
           <X size={14} />
         </button>
@@ -2685,15 +2773,13 @@ const EasterEggTransition: React.FC<{ onComplete: () => void }> = ({ onComplete 
   }, [onComplete]);
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 1.5 } }}
       className="fixed inset-0 z-[200] flex items-center justify-center bg-[#2C302E] overflow-hidden"
     >
       <div className="absolute inset-0 opacity-20" style={{ backgroundImage: noiseSvg }} />
       <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
+        initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }}
         transition={{ duration: 2, ease: 'easeOut' }}
         className="w-[800px] h-[800px] bg-gradient-to-tr from-[#633131] to-[#C69C9C] rounded-full blur-[100px] opacity-40 absolute"
       />
@@ -2716,12 +2802,8 @@ export default function App() {
   const [appMood, setAppMood] = useState<Mood | null>(null);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [ambientSound, setAmbientSound] = useState('piano');
-
-  // One global player, so mixtape links play in the background
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-
-  // Mixtape is now its own drawer, triggered by the floating button (not the nav bar)
   const [showMixtape, setShowMixtape] = useState(false);
 
   useEffect(() => {
@@ -2738,7 +2820,6 @@ export default function App() {
       .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #C69C9C; }
       .hide-scroll::-webkit-scrollbar { display: none; }
       .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
-
       @media print {
         .print-hide { display: none !important; }
         .app-root { background: #FDFBF7 !important; }
@@ -2769,13 +2850,8 @@ export default function App() {
       className="app-root min-h-screen selection:bg-[#C69C9C] selection:text-white relative overflow-x-hidden transition-colors duration-[2000ms] ease-in-out"
       style={{ fontFamily: "'Inter', sans-serif", backgroundColor: bgColor }}
     >
-      <div
-        className="absolute inset-0 pointer-events-none mix-blend-multiply print-hide"
-        style={{ backgroundImage: noiseSvg, zIndex: 1 }}
-      />
-      <div className="print-hide">
-        <FloatingEnvironment />
-      </div>
+      <div className="absolute inset-0 pointer-events-none mix-blend-multiply print-hide" style={{ backgroundImage: noiseSvg, zIndex: 1 }} />
+      <div className="print-hide"><FloatingEnvironment /></div>
 
       <AnimatePresence>
         {!hasOpened ? (
@@ -2785,8 +2861,7 @@ export default function App() {
         ) : (
           <motion.div
             key="main-app"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             transition={{ duration: 1.5 }}
             className="pb-40 relative z-10"
           >
@@ -2801,22 +2876,15 @@ export default function App() {
               />
             </div>
 
-            {/* Floating Mixtape button — mirrored opposite the audio player so they don't collide.
-                On mobile the player is top-left, so this sits top-right. On desktop the player is
-                top-right, so this sits top-left. */}
             <motion.button
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.7, duration: 0.8 }}
               onClick={() => setShowMixtape(true)}
               className="print-hide fixed top-8 right-4 md:right-auto md:left-8 z-[80] bg-white/60 backdrop-blur-xl p-3 md:p-4 rounded-full shadow-sm border border-[#E5D5D5] flex items-center gap-2 group hover:bg-white/90 transition-colors"
               title="Open Our Mixtape"
-              aria-label="Open our mixtape"
             >
               <Music size={18} className="text-[#633131] group-hover:text-[#C69C9C] transition-colors" />
-              <span className="hidden md:inline font-sans text-[11px] uppercase tracking-[0.2em] text-[#826454] font-bold">
-                Mixtape
-              </span>
+              <span className="hidden md:inline font-sans text-[11px] uppercase tracking-[0.2em] text-[#826454] font-bold">Mixtape</span>
             </motion.button>
 
             <MixtapePanel
@@ -2837,11 +2905,7 @@ export default function App() {
                   <MoodCorner key="mood" currentMood={appMood} setAppMood={setAppMood} />
                 )}
                 {activeSection === 'study' && (
-                  <StudyCorner
-                    key="study"
-                    ambientSound={ambientSound}
-                    setAmbientSound={handleSetAmbient}
-                  />
+                  <StudyCorner key="study" ambientSound={ambientSound} setAmbientSound={handleSetAmbient} />
                 )}
                 {activeSection === 'finance' && <FinanceCorner key="finance" />}
                 {activeSection === 'bucket' && <BucketListSection key="bucket" />}
@@ -2851,8 +2915,7 @@ export default function App() {
             </div>
 
             <motion.div
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
+              initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.5, duration: 1 }}
               className="print-hide fixed bottom-8 left-1/2 -translate-x-1/2 z-[80] bg-white/70 backdrop-blur-2xl px-4 py-3 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[95vw] hide-scroll"
             >
@@ -2863,6 +2926,14 @@ export default function App() {
               <NavBtn icon={Target} label="Bucket" isActive={activeSection === 'bucket'} onClick={() => setActiveSection('bucket')} />
               <NavBtn icon={Heart} label="Story" isActive={activeSection === 'story'} onClick={() => setActiveSection('story')} />
               <NavBtn icon={Mail} label="Letter" isActive={activeSection === 'letter'} onClick={() => setActiveSection('letter')} />
+              <button
+                onClick={() => window.print()}
+                className="flex flex-col items-center justify-center p-2 rounded-2xl w-14 h-14 md:w-16 md:h-16 text-[#826454] hover:bg-[#F0EBE1] hover:text-[#633131] transition-all duration-500"
+                title="Export what you're viewing as a keepsake PDF"
+              >
+                <Download size={20} strokeWidth={1.5} className="md:w-[22px] md:h-[22px]" />
+                <span className="text-[9px] md:text-[10px] mt-1 font-sans tracking-wide">PDF</span>
+              </button>
             </motion.div>
 
             <div className="text-center py-16 mt-16 relative z-10">
