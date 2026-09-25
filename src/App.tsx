@@ -1,13 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Home, Palette, Book, Coins, Heart, Mail, Play, Pause, CheckCircle, Circle, 
-  Trash2, Plus, Clock, RefreshCw, Pin, Coffee, Edit2, Target, StickyNote, Sun, 
-  Moon, Cloud, Sparkles, Key, Wind, Droplet, Gift, Send, Lock, PenTool, 
-  CircleDashed, Calendar, Image as ImageIcon, Music, Gamepad2, Volume2, CloudRain, 
-  Trees, Camera, Star
+import {
+  Home, Palette, Book, Coins, Heart, Mail, Play, Pause, CheckCircle, Circle,
+  Trash2, Plus, Clock, RefreshCw, Pin, Coffee, Edit2, Target, StickyNote, Sun,
+  Moon, Cloud, Sparkles, Key, Wind, Droplet, Gift, Send, Lock, PenTool,
+  CircleDashed, Calendar, Image as ImageIcon, Music, Gamepad2, Volume2, CloudRain,
+  Trees, Camera, Star, Upload, PartyPopper, X
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
+/* -------------------- Types -------------------- */
+interface Mood {
+  id: string;
+  label: string;
+  color: string;
+  bgColor: string;
+  msg: string;
+  path: string;
+}
+
+interface BucketItem {
+  id: number;
+  text: string;
+  done: boolean;
+}
+
+interface TaskItem {
+  id: number;
+  text: string;
+  done: boolean;
+}
+
+interface ExpenseItem {
+  id: number;
+  name: string;
+  amount: number;
+}
+
+interface DiaryEntry {
+  id: number;
+  date: string;
+  text: string;
+}
+
+interface MixtapeSong {
+  id: number;
+  title: string;
+  artist: string;
+  note: string;
+  youtubeId?: string;
+  audioUrl?: string;
+}
+
+interface CustomMemory {
+  id: number;
+  date: string;
+  title: string;
+  text: string;
+}
+
+interface OpenWhenLetter {
+  id: number;
+  title: string;
+  msg: string;
+}
+
+/* -------------------- Constants -------------------- */
 const QUOTES = [
   "Some days you don't have to conquer the world. Just take the next little step.",
   "Jigar thinks you can do this.",
@@ -28,14 +86,14 @@ const FORTUNES = [
   "I'm probably thinking about you right now."
 ];
 
-const OPEN_WHEN_LETTERS = [
+const OPEN_WHEN_LETTERS: OpenWhenLetter[] = [
   { id: 1, title: "Open when you miss me", msg: "I'm literally just a text away, Tingu. But if you're reading this, just close your eyes and imagine me wrapping my arms around you from behind. I miss you too." },
   { id: 2, title: "Open when you are angry at me", msg: "Okay, I'm sorry. I probably did something stupid. I am a bit of an idiot sometimes. But I'm *your* idiot. Take a deep breath, and let's talk when you're ready." },
   { id: 3, title: "Open when you can't sleep", msg: "Late night overthinking? Put your phone down, turn on the side table lamp, drink some water, and remember that tomorrow is a fresh start. I love you." },
-  { id: 4, title: "Open when you feel ugly", msg: "Stop. Just stop.Don't ever say that. You are the most breathtaking, beautiful, stunning girl I have ever laid my eyes on. Don't let your mirror lie to you." }
+  { id: 4, title: "Open when you feel ugly", msg: "Stop. Just stop. You are the most breathtaking, beautiful, stunning girl I have ever laid my eyes on. Don't let your mirror lie to you." }
 ];
 
-const BUCKET_LIST = [
+const BUCKET_LIST: BucketItem[] = [
   { id: 1, text: "Late night Momo date", done: false },
   { id: 2, text: "Watch the sunrise from Nagarkot", done: false },
   { id: 3, text: "Cook a horribly messy meal together", done: false },
@@ -43,7 +101,7 @@ const BUCKET_LIST = [
   { id: 5, text: "Fall asleep holding hands", done: true }
 ];
 
-const MOODS = [
+const MOODS: Mood[] = [
   { id: 'happy', label: 'Happy', color: '#E8E1D3', bgColor: '#FFFBF2', msg: "I'm so glad you're feeling good today. Keep glowing, Tingu.", path: "M20 50 Q 40 20, 60 50 T 100 50 T 140 50 Q 160 80, 140 110 T 80 120 T 20 90 Z" },
   { id: 'calm', label: 'Calm', color: '#DCE0D9', bgColor: '#F1F4EE', msg: "Breathe in, breathe out. I love seeing you at peace.", path: "M30 60 Q 50 40, 80 50 T 130 60 T 150 90 Q 130 120, 100 110 T 50 110 Z" },
   { id: 'sad', label: 'Sad', color: '#D4C6C6', bgColor: '#EAE6E6', msg: "It's okay to feel sad. I'm right here with you, wrapping my arms around you.", path: "M40 40 Q 70 30, 90 60 T 120 90 Q 110 130, 80 120 T 30 90 Z" },
@@ -56,34 +114,123 @@ const TIMELINE = [
   { date: "14 December 2024", title: "The day it all started.", text: "We first met. This was the beginning of the entire story." },
   { date: "Around a week later", title: "Our first date.", text: "A week after meeting, we went on our first date. Then somehow, we ended up going on dates for about three days in a row." },
   { date: "Second day of those dates", title: "Our first kiss.", text: "A quiet, beautiful moment that shifted everything." },
-  { date: "23 January 2025", title: "Our first night together.", text: "We were both crazy teenagers, I said 'Lets go' and you couldn't resist, heheh." },
+  { date: "23 January 2025", title: "Our first night together.", text: "We were both sick, and you were on your period, but we still held each other and couldn't let go. Sometimes love is simply being able to hold someone and feel at home." },
   { date: "13 April 2025", title: "Her birthday, together for the first time.", text: "Celebrating you, the way you deserve to be celebrated." },
   { date: "A few months later", title: "The first goodbye.", text: "We broke up for about two weeks. But we loved each other so much that somehow we found our way back to each other." },
   { date: "9 August 2025", title: "Our birthday together.", text: "We celebrated our birthday together for the first time." },
   { date: "7 October 2025", title: "Another goodbye.", text: "We broke up again." },
   { date: "Around two months later", title: "Finding our way back.", text: "Two months later, we were together again." },
-  {date: "13 December 2025", title:"Most Memorable Night", text:"Dhankuta.One Single Night. We both were alone,bare skined- in the same bed, both were sick and you were on your periods but despite the sickness we hugged together so hard that even sickness was shy of us."},
   { date: "13 April 2026", title: "Her birthday, again.", text: "We celebrated her birthday again." },
   { date: "7 May 2026", title: "The hardest chapter.", text: "We broke up again. This time things were harder. I broke your trust completely and thought there was no chance of finding our way back. Some chapters hurt because people make mistakes, and trust can be damaged." },
   { date: "13 September 2026", title: "Somehow, we're here again.", text: "We started talking again. We aren't what you call a couple, but we aren't much far from it either. God has his ways of finishing the story He wrote for the two of us. I love what we have, and I'll do anything to see a smile on your face." }
 ];
 
-const useLocalStorage = (key, initialValue) => {
-  const [storedValue, setStoredValue] = useState(() => {
+const STUDY_TRACKS: Record<string, { url: string; label: string }> = {
+  piano:  { url: '/audio/piano.mp3',  label: 'Piano Focus' },
+  rain:   { url: '/audio/rain.mp3',   label: 'Rainstorm' },
+  forest: { url: '/audio/forest.mp3', label: 'Forest Calm' },
+  lofi:   { url: '/audio/lofi.mp3',   label: 'Lofi Beats' },
+  cafe:   { url: '/audio/cafe.mp3',   label: 'Cafe Ambience' },
+  night:  { url: '/audio/night.mp3',  label: 'Night Vibes' },
+  ocean:  { url: '/audio/ocean.mp3',  label: 'Ocean Waves' },
+};
+
+/* -------------------- Helpers -------------------- */
+function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
+  const [storedValue, setStoredValue] = useState<T>(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) { return initialValue; }
+      return item ? (JSON.parse(item) as T) : initialValue;
+    } catch {
+      return initialValue;
+    }
   });
-  const setValue = (value) => {
+  const setValue = (value: T | ((val: T) => T)) => {
     try {
       const valueToStore = value instanceof Function ? value(storedValue) : value;
       setStoredValue(valueToStore);
       window.localStorage.setItem(key, JSON.stringify(valueToStore));
-    } catch (error) { console.log(error); }
+    } catch (error) {
+      console.log(error);
+    }
   };
   return [storedValue, setValue];
-};
+}
+
+function useCloudStorage<T>(key: string, initialValue: T): [T, (value: T | ((val: T) => T)) => void] {
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    try {
+      const item = window.localStorage.getItem(key);
+      return item ? (JSON.parse(item) as T) : initialValue;
+    } catch {
+      return initialValue;
+    }
+  });
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/state?key=${encodeURIComponent(key)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data || data.value === undefined || data.value === null) return;
+        setStoredValue(data.value as T);
+        try {
+          window.localStorage.setItem(key, JSON.stringify(data.value));
+        } catch {
+          /* ignore quota errors */
+        }
+      })
+      .catch(() => {
+        /* offline, or /api/state not deployed yet — keep using the local copy */
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const setValue = (value: T | ((val: T) => T)) => {
+    setStoredValue((prev) => {
+      const valueToStore = value instanceof Function ? value(prev) : value;
+      try {
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      } catch (error) {
+        console.log(error);
+      }
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        fetch('/api/state', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: valueToStore }),
+        }).catch(() => {
+          /* save failed (offline / KV not configured) — localStorage copy above still holds */
+        });
+      }, 500);
+      return valueToStore;
+    });
+  };
+
+  return [storedValue, setValue];
+}
+
+function extractYouTubeId(input: string): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(trimmed)) return trimmed;
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname.includes('youtu.be')) return url.pathname.slice(1) || null;
+    const v = url.searchParams.get('v');
+    if (v) return v;
+    const embedMatch = url.pathname.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
+    if (embedMatch) return embedMatch[1];
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 const getMoonPhase = () => {
   const lp = 2551442.87690416;
@@ -100,15 +247,84 @@ const getMoonPhase = () => {
   return { name: "Waning Crescent", icon: "🌘" };
 };
 
+const playTimerAlarm = () => {
+  try {
+    const AudioCtx: typeof AudioContext =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    [0, 0.45, 0.9].forEach((offset) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, now + offset);
+      osc.frequency.setValueAtTime(1320, now + offset + 0.08);
+      gain.gain.setValueAtTime(0, now + offset);
+      gain.gain.linearRampToValueAtTime(0.35, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.4);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.45);
+    });
+    if (ctx.state === 'suspended') ctx.resume();
+  } catch (e) {
+    console.log('Timer alarm failed:', e);
+  }
+};
+
 const noiseSvg = `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E")`;
 
-const FloatingEnvironment = () => {
-  const [petals, setPetals] = useState([]);
+/* -------------------- Global Audio: NowPlaying + YouTube API loader -------------------- */
+export type NowPlaying =
+  | { kind: 'file'; url: string; label: string; sublabel?: string }
+  | { kind: 'youtube'; videoId: string; label: string; sublabel?: string };
+
+let ytApiPromise: Promise<any> | null = null;
+function loadYouTubeApi(): Promise<any> {
+  if (typeof window === 'undefined') return Promise.reject(new Error('No window'));
+  const w = window as any;
+  if (w.YT && w.YT.Player) return Promise.resolve(w.YT);
+  if (ytApiPromise) return ytApiPromise;
+  ytApiPromise = new Promise((resolve) => {
+    const previous = w.onYouTubeIframeAPIReady;
+    w.onYouTubeIframeAPIReady = () => {
+      if (typeof previous === 'function') previous();
+      resolve(w.YT);
+    };
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    document.head.appendChild(script);
+  });
+  return ytApiPromise;
+}
+
+/* -------------------- Floating Environment -------------------- */
+interface Petal {
+  id: number;
+  x: number;
+  y: number;
+  size: number;
+  duration: number;
+  delay: number;
+  rotation: number;
+  type: 'petal' | 'orb';
+}
+
+const FloatingEnvironment: React.FC = () => {
+  const [petals, setPetals] = useState<Petal[]>([]);
   useEffect(() => {
-    const newPetals = Array.from({ length: 25 }).map((_, i) => ({
-      id: i, x: Math.random() * 100, y: Math.random() * 100, size: Math.random() * 15 + 10,
-      duration: Math.random() * 30 + 30, delay: Math.random() * 10, rotation: Math.random() * 360,
-      type: Math.random() > 0.5 ? 'petal' : 'orb'
+    const newPetals: Petal[] = Array.from({ length: 25 }).map((_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 15 + 10,
+      duration: Math.random() * 30 + 30,
+      delay: Math.random() * 10,
+      rotation: Math.random() * 360,
+      type: Math.random() > 0.5 ? 'petal' : 'orb',
     }));
     setPetals(newPetals);
   }, []);
@@ -117,13 +333,20 @@ const FloatingEnvironment = () => {
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-60">
       {petals.map((el) => (
         <motion.div
-          key={el.id} className={`absolute ${el.type === 'orb' ? 'rounded-full bg-[#C69C9C]/10 blur-xl' : ''}`}
+          key={el.id}
+          className={`absolute ${el.type === 'orb' ? 'rounded-full bg-[#C69C9C]/10 blur-xl' : ''}`}
           style={{ width: el.size, height: el.size, left: `${el.x}%`, top: `${el.y}%` }}
-          animate={{ y: ['10vh', '-110vh'], x: [`${el.x}vw`, `${el.x + (Math.random() * 20 - 10)}vw`], rotate: [el.rotation, el.rotation + 360] }}
+          animate={{
+            y: ['10vh', '-110vh'],
+            x: [`${el.x}vw`, `${el.x + (Math.random() * 20 - 10)}vw`],
+            rotate: [el.rotation, el.rotation + 360],
+          }}
           transition={{ duration: el.duration, delay: el.delay, repeat: Infinity, ease: 'linear' }}
         >
           {el.type === 'petal' && (
-            <svg viewBox="0 0 100 100" className="w-full h-full fill-[#C69C9C] opacity-20"><path d="M50 0 C 80 30, 100 70, 50 100 C 0 70, 20 30, 50 0 Z" /></svg>
+            <svg viewBox="0 0 100 100" className="w-full h-full fill-[#C69C9C] opacity-20">
+              <path d="M50 0 C 80 30, 100 70, 50 100 C 0 70, 20 30, 50 0 Z" />
+            </svg>
           )}
         </motion.div>
       ))}
@@ -131,70 +354,124 @@ const FloatingEnvironment = () => {
   );
 };
 
-const NavBtn = ({ icon: Icon, label, isActive, onClick }) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-500 w-14 h-14 md:w-16 md:h-16 relative group ${isActive ? 'bg-[#C69C9C] text-white shadow-[0_10px_25px_rgba(198,156,156,0.4)] scale-110' : 'text-[#826454] hover:bg-[#F0EBE1] hover:text-[#633131]'}`}>
-    {isActive && <motion.div layoutId="nav-indicator" className="absolute inset-0 bg-[#C69C9C] rounded-2xl z-0" />}
-    <Icon size={20} strokeWidth={1.5} className={`md:w-[22px] md:h-[22px] relative z-10 transition-transform ${isActive ? '' : 'group-hover:-translate-y-1'}`} />
+/* -------------------- Nav Button -------------------- */
+interface NavBtnProps {
+  icon: LucideIcon;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const NavBtn: React.FC<NavBtnProps> = ({ icon: Icon, label, isActive, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`flex flex-col items-center justify-center p-2 rounded-2xl transition-all duration-500 w-14 h-14 md:w-16 md:h-16 relative group ${
+      isActive
+        ? 'bg-[#C69C9C] text-white shadow-[0_10px_25px_rgba(198,156,156,0.4)] scale-110'
+        : 'text-[#826454] hover:bg-[#F0EBE1] hover:text-[#633131]'
+    }`}
+  >
+    {isActive && (
+      <motion.div layoutId="nav-indicator" className="absolute inset-0 bg-[#C69C9C] rounded-2xl z-0" />
+    )}
+    <Icon size={20} strokeWidth={1.5} className="md:w-[22px] md:h-[22px] relative z-10" />
     <span className="text-[9px] md:text-[10px] mt-1 font-sans tracking-wide relative z-10">{label}</span>
   </button>
 );
 
-const OpeningSequence = ({ onComplete }) => {
+/* -------------------- Opening Sequence -------------------- */
+const OpeningSequence: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
   useEffect(() => {
     const timer = setTimeout(onComplete, 5500);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
-    <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 2, ease: "easeInOut" } }} className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#F9F6F0]" style={{ backgroundImage: noiseSvg }}>
-      <motion.div initial={{ opacity: 0, scale: 0.85, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 2, ease: "easeOut", delay: 0.5 }} className="text-center px-6 relative">
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 2, ease: 'easeInOut' } }}
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#F9F6F0]"
+      style={{ backgroundImage: noiseSvg }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.85, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 2, ease: 'easeOut', delay: 0.5 }}
+        className="text-center px-6 relative"
+      >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#C69C9C] rounded-full blur-[120px] opacity-20 pointer-events-none" />
-        <h1 className="font-serif text-5xl md:text-7xl text-[#2C302E] mb-6 tracking-wide drop-shadow-sm relative z-10">Welcome home, Tingu</h1>
-        <motion.div initial={{ opacity: 0, width: 0 }} animate={{ opacity: 1, width: "100%" }} transition={{ duration: 1.5, delay: 2.5 }} className="h-[1px] bg-gradient-to-r from-transparent via-[#C69C9C] to-transparent mx-auto mb-6 max-w-[200px]" />
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.5, delay: 3 }} className="font-sans text-sm md:text-lg text-[#826454] italic tracking-wider relative z-10">A little corner of the internet that belongs to you.</motion.p>
+        <h1 className="font-serif text-5xl md:text-7xl text-[#2C302E] mb-6 tracking-wide drop-shadow-sm relative z-10">
+          Welcome home, Tingu
+        </h1>
+        <motion.div
+          initial={{ opacity: 0, width: 0 }}
+          animate={{ opacity: 1, width: '100%' }}
+          transition={{ duration: 1.5, delay: 2.5 }}
+          className="h-[1px] bg-gradient-to-r from-transparent via-[#C69C9C] to-transparent mx-auto mb-6 max-w-[200px]"
+        />
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 1.5, delay: 3 }}
+          className="font-sans text-sm md:text-lg text-[#826454] italic tracking-wider relative z-10"
+        >
+          A little corner of the internet that belongs to you.
+        </motion.p>
       </motion.div>
     </motion.div>
   );
 };
 
-const HomeSection = ({ setSection, triggerEasterEgg }) => {
+/* -------------------- Home Section -------------------- */
+interface HomeSectionProps {
+  setSection: (section: string) => void;
+  triggerEasterEgg: () => void;
+}
+
+const HomeSection: React.FC<HomeSectionProps> = ({ setSection, triggerEasterEgg }) => {
   const [quoteIndex, setQuoteIndex] = useState(() => Math.floor(Math.random() * QUOTES.length));
   const [greeting, setGreeting] = useState('');
-  const [greetingIcon, setGreetingIcon] = useState(null);
+  const [greetingIcon, setGreetingIcon] = useState<React.ReactNode>(null);
   const [showHug, setShowHug] = useState(false);
   const [cookieBroken, setCookieBroken] = useState(false);
-  const [fortuneMsg, setFortuneMsg] = useState("Crack me open!");
+  const [fortuneMsg, setFortuneMsg] = useState('Crack me open!');
   const [timeTogether, setTimeTogether] = useState({ days: 0, hrs: 0 });
   const moonPhase = getMoonPhase();
 
-  // FEATURE 1: Comfort Hub (Period Tracker) State
   const [showPeriodHub, setShowPeriodHub] = useState(false);
-  const [lastPeriod, setLastPeriod] = useLocalStorage('sriju_last_period', null);
+  const [lastPeriod, setLastPeriod] = useCloudStorage<string | null>('sriju_last_period', null);
 
-  // FEATURE 2: Sprout Plant State
-  const [plantLevel, setPlantLevel] = useLocalStorage('sriju_plant_level', 1);
-  const [lastWatered, setLastWatered] = useLocalStorage('sriju_plant_watered', null);
+  const [plantLevel, setPlantLevel] = useCloudStorage<number>('sriju_plant_level', 1);
+  const [lastWatered, setLastWatered] = useCloudStorage<string | null>('sriju_plant_watered', null);
 
-  // FEATURE 3: Digital Locket State
-  const [locketImage, setLocketImage] = useLocalStorage('sriju_locket_img', null);
+  const [locketImage, setLocketImage] = useLocalStorage<string | null>('sriju_locket_img', null);
   const [isLocketOpen, setIsLocketOpen] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // FEATURE 6: Food Spinner State
   const [spinning, setSpinning] = useState(false);
-  const [foodChoice, setFoodChoice] = useState("?");
-  const foods = ["Momo", "Thakali", "Pizza", "Chowmein", "Burger", "Sadeko WaiWai", "Laphing"];
+  const [foodChoice, setFoodChoice] = useState('?');
+  const foods = ['Momo', 'Thakali', 'Pizza', 'Chowmein', 'Burger', 'Sadeko WaiWai', 'Laphing'];
 
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) { setGreeting("Good morning"); setGreetingIcon(<Sun size={28} className="text-[#D4A373]" />); }
-    else if (hour < 18) { setGreeting("Good afternoon"); setGreetingIcon(<Cloud size={28} className="text-[#A3B18A]" />); }
-    else { setGreeting("Good evening"); setGreetingIcon(<Moon size={28} className="text-[#84A59D]" />); }
+    if (hour < 12) {
+      setGreeting('Good morning');
+      setGreetingIcon(<Sun size={28} className="text-[#D4A373]" />);
+    } else if (hour < 18) {
+      setGreeting('Good afternoon');
+      setGreetingIcon(<Cloud size={28} className="text-[#A3B18A]" />);
+    } else {
+      setGreeting('Good evening');
+      setGreetingIcon(<Moon size={28} className="text-[#84A59D]" />);
+    }
 
     const calcTime = () => {
-      const start = new Date('2024-12-14T00:00:00');
-      const diff = new Date() - start;
-      setTimeTogether({ days: Math.floor(diff / (1000 * 60 * 60 * 24)), hrs: Math.floor((diff / (1000 * 60 * 60)) % 24) });
+      const start = new Date('2024-12-14T00:00:00').getTime();
+      const diff = Date.now() - start;
+      setTimeTogether({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hrs: Math.floor((diff / (1000 * 60 * 60)) % 24),
+      });
     };
     calcTime();
     const timer = setInterval(calcTime, 1000 * 60 * 60);
@@ -202,7 +479,7 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
   }, []);
 
   const crackCookie = () => {
-    if(!cookieBroken) {
+    if (!cookieBroken) {
       setCookieBroken(true);
       setFortuneMsg(FORTUNES[Math.floor(Math.random() * FORTUNES.length)]);
       setTimeout(() => setCookieBroken(false), 5000);
@@ -213,15 +490,15 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
     const today = new Date().toDateString();
     if (lastWatered !== today) {
       setLastWatered(today);
-      setPlantLevel(prev => Math.min(prev + 1, 5));
+      setPlantLevel((prev) => Math.min(prev + 1, 5));
     }
   };
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => setLocketImage(reader.result);
+      reader.onloadend = () => setLocketImage(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
@@ -241,65 +518,110 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
   };
 
   const nextPeriodDate = lastPeriod ? new Date(new Date(lastPeriod).getTime() + 28 * 24 * 60 * 60 * 1000) : null;
-  const daysUntilNext = nextPeriodDate ? Math.ceil((nextPeriodDate - new Date()) / (1000 * 60 * 60 * 24)) : null;
+  const daysUntilNext = nextPeriodDate
+    ? Math.ceil((nextPeriodDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.8 }} className="max-w-7xl mx-auto min-h-[85vh] px-4 pt-4 pb-24 relative z-10">
-      
-      {/* THE SECRET EASTER EGG */}
-      <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }} className="absolute top-10 right-4 md:right-12 z-50 cursor-pointer flex flex-col items-center group" onClick={triggerEasterEgg}>
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.8 }}
+      className="max-w-7xl mx-auto min-h-[85vh] px-4 pt-4 pb-24 relative z-10"
+    >
+      <motion.div
+        animate={{ y: [0, -10, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+        className="print-hide absolute top-10 right-4 md:right-12 z-50 cursor-pointer flex flex-col items-center group"
+        onClick={triggerEasterEgg}
+      >
         <div className="w-12 h-12 rounded-full bg-white/40 backdrop-blur-md border border-[#C69C9C]/30 flex items-center justify-center shadow-[0_0_20px_rgba(198,156,156,0.3)] group-hover:bg-[#C69C9C] transition-colors duration-500">
-           <Key size={20} className="text-[#C69C9C] group-hover:text-white transition-colors" />
+          <Key size={20} className="text-[#C69C9C] group-hover:text-white transition-colors" />
         </div>
-        <p className="font-['Caveat'] text-[#826454] mt-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">Don't touch this...</p>
+        <p className="font-['Caveat'] text-[#826454] mt-2 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+          Don't touch this...
+        </p>
       </motion.div>
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-stretch">
-        
-        {/* Main Left Column (Greeting & Quote) */}
         <div className="md:col-span-8 flex flex-col gap-6">
           <motion.div className="bg-white/50 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white/60 shadow-sm flex flex-col justify-center min-h-[160px]">
             <div className="flex items-center gap-4 mb-2">
               {greetingIcon}
               <h2 className="font-serif text-3xl md:text-5xl text-[#2C302E]">{greeting}, Tingu.</h2>
             </div>
-            <p className="font-sans text-[#826454] text-base md:text-lg pl-12">I built this place just for you. Take your time.</p>
+            <p className="font-sans text-[#826454] text-base md:text-lg pl-12">
+              I built this place just for you. Take your time.
+            </p>
           </motion.div>
 
-          <motion.div onClick={() => setQuoteIndex((quoteIndex + 1) % QUOTES.length)} className="flex-1 bg-[#FDFBF7] p-10 rounded-[2.5rem] shadow-sm border border-[#E5D5D5] relative group cursor-pointer overflow-hidden min-h-[250px] flex flex-col justify-center">
-            <div className="absolute top-6 left-6 text-[#C69C9C]/30"><Pin size={28} fill="#C69C9C" strokeWidth={1} /></div>
+          <motion.div
+            onClick={() => setQuoteIndex((quoteIndex + 1) % QUOTES.length)}
+            className="flex-1 bg-[#FDFBF7] p-10 rounded-[2.5rem] shadow-sm border border-[#E5D5D5] relative group cursor-pointer overflow-hidden min-h-[250px] flex flex-col justify-center"
+          >
+            <div className="absolute top-6 left-6 text-[#C69C9C]/30">
+              <Pin size={28} fill="#C69C9C" strokeWidth={1} />
+            </div>
             <div className="h-full flex flex-col justify-center items-center text-center space-y-6 relative z-10">
               <AnimatePresence mode="wait">
-                <motion.p key={quoteIndex} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="font-serif text-2xl md:text-4xl text-[#633131] leading-relaxed">"{QUOTES[quoteIndex]}"</motion.p>
+                <motion.p
+                  key={quoteIndex}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="font-serif text-2xl md:text-4xl text-[#633131] leading-relaxed"
+                >
+                  "{QUOTES[quoteIndex]}"
+                </motion.p>
               </AnimatePresence>
               <p className="font-['Caveat'] text-3xl text-[#826454] opacity-90">— Jigar</p>
             </div>
-            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-40 transition-opacity"><RefreshCw size={20} className="text-[#826454]" /></div>
+            <div className="absolute bottom-6 right-6 opacity-0 group-hover:opacity-40 transition-opacity">
+              <RefreshCw size={20} className="text-[#826454]" />
+            </div>
           </motion.div>
-          
-          {/* Mini Widgets Row */}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Plant Tamagotchi */}
-            <motion.div whileHover={{ scale: 1.05 }} onClick={waterPlant} className="bg-[#E8ECE4] p-4 rounded-3xl border border-white shadow-sm flex flex-col items-center justify-center cursor-pointer relative overflow-hidden h-32 group">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              onClick={waterPlant}
+              className="bg-[#E8ECE4] p-4 rounded-3xl border border-white shadow-sm flex flex-col items-center justify-center cursor-pointer relative overflow-hidden h-32 group"
+            >
               <div className="text-4xl mb-2 transition-transform group-hover:scale-110">
                 {plantLevel === 1 ? '🌱' : plantLevel === 2 ? '🌿' : plantLevel === 3 ? '🪴' : plantLevel === 4 ? '🪴✨' : '🌳'}
               </div>
               <p className="font-sans text-xs text-[#826454] font-medium text-center">
-                {lastWatered === new Date().toDateString() ? "Happy & Watered" : "Needs water! (Click)"}
+                {lastWatered === new Date().toDateString() ? 'Happy & Watered' : 'Needs water! (Click)'}
               </p>
-              <Droplet size={14} className={`absolute top-3 right-3 ${lastWatered === new Date().toDateString() ? 'text-[#9CA893]' : 'text-[#826454] opacity-30 animate-bounce'}`} />
+              <Droplet
+                size={14}
+                className={`absolute top-3 right-3 ${
+                  lastWatered === new Date().toDateString()
+                    ? 'text-[#9CA893]'
+                    : 'text-[#826454] opacity-30 animate-bounce'
+                }`}
+              />
             </motion.div>
 
-            {/* Food Spinner */}
-            <motion.div whileHover={{ scale: 1.05 }} onClick={spinFood} className="bg-[#F5E6E6] p-4 rounded-3xl border border-white shadow-sm flex flex-col items-center justify-center cursor-pointer h-32 text-center group">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              onClick={spinFood}
+              className="bg-[#F5E6E6] p-4 rounded-3xl border border-white shadow-sm flex flex-col items-center justify-center cursor-pointer h-32 text-center group"
+            >
               <span className="text-xs uppercase tracking-widest text-[#633131] mb-2">What to eat?</span>
-              <motion.div animate={spinning ? { rotateX: 360, scale: 1.1 } : {}} transition={{ duration: 0.2, repeat: spinning ? Infinity : 0 }} className="font-serif text-xl text-[#2C302E] font-bold">
+              <motion.div
+                animate={spinning ? { rotateX: 360, scale: 1.1 } : {}}
+                transition={{ duration: 0.2, repeat: spinning ? Infinity : 0 }}
+                className="font-serif text-xl text-[#2C302E] font-bold"
+              >
                 {foodChoice}
               </motion.div>
-              <p className="font-sans text-[10px] text-[#826454] mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Spin me</p>
+              <p className="font-sans text-[10px] text-[#826454] mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Spin me
+              </p>
             </motion.div>
 
-            {/* Moon Phase Widget */}
             <div className="bg-[#2C302E] p-4 rounded-3xl shadow-sm flex flex-col items-center justify-center h-32 text-center relative overflow-hidden col-span-2 md:col-span-2 border border-[#4A4343]">
               <div className="absolute inset-0 opacity-20" style={{ backgroundImage: noiseSvg }} />
               <div className="flex items-center gap-4 relative z-10">
@@ -313,19 +635,22 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
           </div>
         </div>
 
-        {/* Right Sidebar Widgets */}
         <div className="md:col-span-4 flex flex-col gap-6">
-          
-          {/* THE NEW PROMINENT PERIOD COMFORT HUB */}
-          <motion.div whileHover={{ scale: 1.02 }} onClick={() => setShowPeriodHub(true)} className="bg-gradient-to-br from-[#F5E6E6] to-[#EAE6E6] p-6 rounded-[2rem] border border-white/50 shadow-sm relative overflow-hidden flex flex-col justify-center cursor-pointer h-40 group">
-            <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-[#C69C9C]/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700"></div>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            onClick={() => setShowPeriodHub(true)}
+            className="bg-gradient-to-br from-[#F5E6E6] to-[#EAE6E6] p-6 rounded-[2rem] border border-white/50 shadow-sm relative overflow-hidden flex flex-col justify-center cursor-pointer h-40 group"
+          >
+            <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-[#C69C9C]/20 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-700" />
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <h3 className="font-serif text-2xl text-[#633131] mb-1">Comfort Hub</h3>
                 <p className="font-sans text-sm text-[#826454]">
-                  {daysUntilNext !== null 
-                    ? (daysUntilNext > 0 ? `${daysUntilNext} days until next cycle` : "Cycle might be starting")
-                    : "Tap to set up"}
+                  {daysUntilNext !== null
+                    ? daysUntilNext > 0
+                      ? `${daysUntilNext} days until next cycle`
+                      : 'Cycle might be starting'
+                    : 'Tap to set up'}
                 </p>
               </div>
               <div className="w-12 h-12 bg-white/60 rounded-full flex items-center justify-center shadow-sm">
@@ -334,70 +659,127 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
             </div>
           </motion.div>
 
-          {/* Time Together Widget */}
-          <motion.div whileHover={{ scale: 1.02 }} className="bg-white/40 p-6 rounded-[2rem] border border-[#E5D5D5] shadow-sm flex flex-col justify-center items-center text-center h-32">
-            <h3 className="font-sans text-xs uppercase tracking-widest text-[#826454] mb-2">Survived Each Other For</h3>
+          <motion.div
+            whileHover={{ scale: 1.02 }}
+            className="bg-white/40 p-6 rounded-[2rem] border border-[#E5D5D5] shadow-sm flex flex-col justify-center items-center text-center h-32"
+          >
+            <h3 className="font-sans text-xs uppercase tracking-widest text-[#826454] mb-2">
+              Survived Each Other For
+            </h3>
             <div className="font-serif text-4xl text-[#633131] flex items-end gap-2">
-              {timeTogether.days} <span className="text-xl text-[#826454] mb-1">days</span> 
+              {timeTogether.days}
+              <span className="text-xl text-[#826454] mb-1">days</span>
             </div>
           </motion.div>
 
-          {/* Digital Locket */}
-          <motion.div onClick={() => setIsLocketOpen(true)} whileHover={{ scale: 1.02 }} className="bg-gradient-to-tr from-[#D4A373]/20 to-[#E8E1D3] p-6 rounded-[2rem] border border-white/50 shadow-sm cursor-pointer flex items-center justify-center group h-32 relative overflow-hidden">
-             <div className="w-16 h-16 rounded-full border-[3px] border-[#C69C9C] bg-[#FDFBF7] flex items-center justify-center shadow-inner relative z-10 overflow-hidden">
-               {locketImage ? (
-                 <img src={locketImage} alt="Locket" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-               ) : (
-                 <Camera size={24} className="text-[#C69C9C]" />
-               )}
-             </div>
-             <p className="absolute bottom-3 font-sans text-[10px] uppercase tracking-widest text-[#826454]">Digital Locket</p>
+          <motion.div
+            onClick={() => setIsLocketOpen(true)}
+            whileHover={{ scale: 1.02 }}
+            className="bg-gradient-to-tr from-[#D4A373]/20 to-[#E8E1D3] p-6 rounded-[2rem] border border-white/50 shadow-sm cursor-pointer flex items-center justify-center group h-32 relative overflow-hidden"
+          >
+            <div className="w-16 h-16 rounded-full border-[3px] border-[#C69C9C] bg-[#FDFBF7] flex items-center justify-center shadow-inner relative z-10 overflow-hidden">
+              {locketImage ? (
+                <img
+                  src={locketImage}
+                  alt="Locket"
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                />
+              ) : (
+                <Camera size={24} className="text-[#C69C9C]" />
+              )}
+            </div>
+            <p className="absolute bottom-3 font-sans text-[10px] uppercase tracking-widest text-[#826454]">
+              Digital Locket
+            </p>
           </motion.div>
         </div>
       </div>
 
-      {/* Main Navigation Bento */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-6">
-        <motion.div whileHover={{ scale: 1.03 }} onClick={() => setSection('mood')} className="col-span-2 md:col-span-2 bg-[#F5E6E6] p-8 rounded-[2rem] shadow-sm group min-h-[180px] cursor-pointer border border-white relative overflow-hidden">
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          onClick={() => setSection('mood')}
+          className="col-span-2 md:col-span-2 bg-[#F5E6E6] p-8 rounded-[2rem] shadow-sm group min-h-[180px] cursor-pointer border border-white relative overflow-hidden"
+        >
           <Palette size={32} className="text-[#C69C9C] mb-4" />
           <h3 className="font-serif text-3xl text-[#633131]">Mood & Memories</h3>
           <p className="font-sans text-sm text-[#826454]">Change the room, open the Memory Jar.</p>
-          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/30 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+          <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/30 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-1000" />
         </motion.div>
-        <motion.div whileHover={{ scale: 1.05 }} onClick={() => setSection('finance')} className="bg-[#F0EBE1] p-6 rounded-[2rem] shadow-sm group border border-white cursor-pointer aspect-square flex flex-col items-center justify-center text-center">
-          <div className="w-14 h-14 rounded-full bg-white/60 flex items-center justify-center mb-3 group-hover:bg-[#9CA893] transition-colors"><Coins size={24} className="text-[#9CA893] group-hover:text-white" /></div>
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          onClick={() => setSection('finance')}
+          className="bg-[#F0EBE1] p-6 rounded-[2rem] shadow-sm group border border-white cursor-pointer aspect-square flex flex-col items-center justify-center text-center"
+        >
+          <div className="w-14 h-14 rounded-full bg-white/60 flex items-center justify-center mb-3 group-hover:bg-[#9CA893] transition-colors">
+            <Coins size={24} className="text-[#9CA893] group-hover:text-white" />
+          </div>
           <h3 className="font-serif text-xl text-[#2C302E]">Rs. Jar</h3>
         </motion.div>
-        <motion.div whileHover={{ scale: 1.05 }} onClick={() => setSection('story')} className="bg-white/60 p-6 rounded-[2rem] shadow-sm group border border-[#E5D5D5] cursor-pointer aspect-square flex flex-col items-center justify-center text-center">
-          <div className="w-14 h-14 rounded-full bg-[#F9F4F4] flex items-center justify-center mb-3 group-hover:bg-[#C69C9C] transition-colors"><Heart size={24} className="text-[#C69C9C] group-hover:text-white" /></div>
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          onClick={() => setSection('story')}
+          className="bg-white/60 p-6 rounded-[2rem] shadow-sm group border border-[#E5D5D5] cursor-pointer aspect-square flex flex-col items-center justify-center text-center"
+        >
+          <div className="w-14 h-14 rounded-full bg-[#F9F4F4] flex items-center justify-center mb-3 group-hover:bg-[#C69C9C] transition-colors">
+            <Heart size={24} className="text-[#C69C9C] group-hover:text-white" />
+          </div>
           <h3 className="font-serif text-xl text-[#2C302E]">Our Story</h3>
         </motion.div>
       </div>
 
-      {/* Comfort Hub Modal */}
       <AnimatePresence>
         {showPeriodHub && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F5E6E6]/95 backdrop-blur-md px-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-[#F5E6E6]/95 backdrop-blur-md px-4"
+          >
             <div className="max-w-md w-full bg-white p-10 rounded-[3rem] text-center shadow-2xl border border-[#E5D5D5] relative overflow-hidden">
-              <button onClick={() => setShowPeriodHub(false)} className="absolute top-6 right-6 text-[#633131] hover:text-black">Close</button>
+              <button
+                onClick={() => setShowPeriodHub(false)}
+                className="absolute top-6 right-6 text-[#633131] hover:text-black"
+              >
+                Close
+              </button>
               <div className="text-5xl mb-6 flex justify-center gap-4">🍫 🧸 🫖</div>
               <h2 className="font-serif text-3xl text-[#633131] mb-2">Tingu's Comfort Hub</h2>
-              
+
               <div className="bg-[#FDFBF7] p-4 rounded-2xl mb-6 border border-[#E5D5D5] mt-6">
-                <p className="font-sans text-sm text-[#826454] mb-2 uppercase tracking-widest">Cycle Tracker</p>
+                <p className="font-sans text-sm text-[#826454] mb-2 uppercase tracking-widest">
+                  Cycle Tracker
+                </p>
                 <div className="flex items-center justify-center gap-4">
-                  <input type="date" value={lastPeriod || ''} onChange={(e) => setLastPeriod(e.target.value)} className="bg-white border border-[#C69C9C]/30 rounded-lg p-2 font-sans text-sm outline-none" />
+                  <input
+                    type="date"
+                    value={lastPeriod || ''}
+                    onChange={(e) => setLastPeriod(e.target.value)}
+                    className="bg-white border border-[#C69C9C]/30 rounded-lg p-2 font-sans text-sm outline-none"
+                  />
                 </div>
                 {daysUntilNext !== null && (
                   <p className="font-serif text-lg text-[#633131] mt-3">
-                    {daysUntilNext > 0 ? `Next cycle in roughly ${daysUntilNext} days` : "Take care of yourself today."}
+                    {daysUntilNext > 0
+                      ? `Next cycle in roughly ${daysUntilNext} days`
+                      : 'Take care of yourself today.'}
                   </p>
                 )}
               </div>
 
-              <p className="font-sans text-[#826454] text-lg leading-relaxed mb-6">I know it hurts right now. Get your hot water bag, eat some chocolate, and rest. You don't have to do anything else today except take care of yourself.</p>
-              
-              <button onClick={() => { setShowPeriodHub(false); setShowHug(true); setTimeout(() => setShowHug(false), 3000); }} className="w-full bg-[#C69C9C] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#B58B8B] transition-colors shadow-sm">
+              <p className="font-sans text-[#826454] text-lg leading-relaxed mb-6">
+                I know it hurts right now. Get your hot water bag, eat some chocolate, and rest. You
+                don't have to do anything else today except take care of yourself.
+              </p>
+
+              <button
+                onClick={() => {
+                  setShowPeriodHub(false);
+                  setShowHug(true);
+                  setTimeout(() => setShowHug(false), 3000);
+                }}
+                className="w-full bg-[#C69C9C] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#B58B8B] transition-colors shadow-sm"
+              >
                 Request Emergency Hug
               </button>
             </div>
@@ -405,12 +787,27 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
         )}
       </AnimatePresence>
 
-      {/* Digital Locket Modal */}
       <AnimatePresence>
         {isLocketOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-            <motion.div initial={{ scale: 0.8, rotateY: 90 }} animate={{ scale: 1, rotateY: 0 }} exit={{ scale: 0.8, rotateY: -90 }} transition={{ type: "spring", duration: 1 }} className="max-w-sm w-full bg-[#E8E1D3] p-4 rounded-[2rem] border-[4px] border-[#D4A373] shadow-2xl relative">
-              <button onClick={() => setIsLocketOpen(false)} className="absolute -top-12 right-0 text-white font-sans text-sm">Close</button>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.8, rotateY: 90 }}
+              animate={{ scale: 1, rotateY: 0 }}
+              exit={{ scale: 0.8, rotateY: -90 }}
+              transition={{ type: 'spring', duration: 1 }}
+              className="max-w-sm w-full bg-[#E8E1D3] p-4 rounded-[2rem] border-[4px] border-[#D4A373] shadow-2xl relative"
+            >
+              <button
+                onClick={() => setIsLocketOpen(false)}
+                className="absolute -top-12 right-0 text-white font-sans text-sm"
+              >
+                Close
+              </button>
               <div className="aspect-[3/4] bg-[#2C302E] rounded-2xl overflow-hidden relative flex items-center justify-center border-4 border-[#FDFBF7]">
                 {locketImage ? (
                   <img src={locketImage} alt="Locket Memory" className="w-full h-full object-cover" />
@@ -418,11 +815,22 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
                   <div className="text-center p-6 text-[#A3B18A]">
                     <ImageIcon size={48} className="mx-auto mb-4 opacity-50" />
                     <p className="font-serif text-lg">Empty Locket</p>
-                    <p className="font-sans text-xs mt-2 opacity-70">Upload one special photo to keep here forever.</p>
+                    <p className="font-sans text-xs mt-2 opacity-70">
+                      Upload one special photo to keep here forever.
+                    </p>
                   </div>
                 )}
-                <input type="file" accept="image/*" onChange={handleImageUpload} ref={fileInputRef} className="hidden" />
-                <button onClick={() => fileInputRef.current.click()} className="absolute bottom-4 right-4 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  ref={fileInputRef}
+                  className="hidden"
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="absolute bottom-4 right-4 bg-white/20 backdrop-blur-md p-3 rounded-full text-white hover:bg-white/40 transition-colors"
+                >
                   <Camera size={20} />
                 </button>
               </div>
@@ -431,14 +839,26 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
         )}
       </AnimatePresence>
 
-      {/* Hug Animation Overlay */}
       <AnimatePresence>
         {showHug && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20 backdrop-blur-sm pointer-events-none">
-             <motion.div initial={{ scale: 0, rotate: -20 }} animate={{ scale: [0, 1.5, 1.2, 1.3], rotate: [0, -10, 10, 0] }} exit={{ scale: 0, opacity: 0 }} transition={{ duration: 1 }} className="flex flex-col items-center">
-               <Heart size={150} className="text-[#C69C9C] fill-[#C69C9C]" />
-               <h2 className="font-serif text-6xl text-white mt-6 drop-shadow-lg tracking-widest">SQUEEEEEZE!</h2>
-             </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center bg-black/20 backdrop-blur-sm pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: [0, 1.5, 1.2, 1.3], rotate: [0, -10, 10, 0] }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 1 }}
+              className="flex flex-col items-center"
+            >
+              <Heart size={150} className="text-[#C69C9C] fill-[#C69C9C]" />
+              <h2 className="font-serif text-6xl text-white mt-6 drop-shadow-lg tracking-widest">
+                SQUEEEEEZE!
+              </h2>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -446,89 +866,176 @@ const HomeSection = ({ setSection, triggerEasterEgg }) => {
   );
 };
 
-const MoodCorner = ({ currentMood, setAppMood }) => {
+/* -------------------- Mood Corner -------------------- */
+interface MoodCornerProps {
+  currentMood: Mood | null;
+  setAppMood: (mood: Mood) => void;
+}
+
+const MoodCorner: React.FC<MoodCornerProps> = ({ currentMood, setAppMood }) => {
   const [showBreathing, setShowBreathing] = useState(false);
   const [showMemoryJar, setShowMemoryJar] = useState(false);
-  const [memories, setMemories] = useLocalStorage('sriju_memories', []);
-  const [newMemory, setNewMemory] = useState("");
+  const [memories, setMemories] = useCloudStorage<{ id: number; text: string }[]>('sriju_memories', []);
+  const [newMemory, setNewMemory] = useState('');
 
-  const addMemory = (e) => {
+  const addMemory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemory.trim()) return;
     setMemories([...memories, { id: Date.now(), text: newMemory }]);
-    setNewMemory("");
+    setNewMemory('');
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-5xl mx-auto min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 relative z-10">
-      
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-5xl mx-auto min-h-[80vh] flex flex-col items-center justify-center px-4 py-12 relative z-10"
+    >
       <div className="absolute top-0 right-4 flex gap-4">
-        <button onClick={() => setShowBreathing(true)} className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-full text-[#826454] font-sans text-sm hover:bg-white shadow-sm transition">
+        <button
+          onClick={() => setShowBreathing(true)}
+          className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-full text-[#826454] font-sans text-sm hover:bg-white shadow-sm transition"
+        >
           <Wind size={16} /> Breathe
         </button>
       </div>
 
       <div className="text-center mb-12 mt-12">
-        <h2 className="font-serif text-5xl text-[#2C302E] mb-4 drop-shadow-sm">How are you feeling?</h2>
+        <h2 className="font-serif text-5xl text-[#2C302E] mb-4 drop-shadow-sm">
+          How are you feeling?
+        </h2>
         <p className="font-sans text-[#826454] text-lg">Tap a color. The whole room will listen to you.</p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-16 w-full place-items-center mb-16 max-w-3xl">
         {MOODS.map((mood) => (
-          <motion.button key={mood.id} whileHover={{ scale: 1.15, rotate: Math.random() * 15 - 7.5 }} whileTap={{ scale: 0.9 }} onClick={() => setAppMood(mood)} className="flex flex-col items-center gap-6 group relative">
+          <motion.button
+            key={mood.id}
+            whileHover={{ scale: 1.15, rotate: Math.random() * 15 - 7.5 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setAppMood(mood)}
+            className="flex flex-col items-center gap-6 group relative"
+          >
             <div className="relative">
-              {currentMood?.id === mood.id && <motion.div layoutId="mood-glow" className="absolute -inset-6 bg-white/70 rounded-full blur-2xl" />}
-              <svg viewBox="0 0 200 150" className={`w-28 h-28 md:w-40 md:h-40 drop-shadow-lg transition-all duration-700 relative z-10 ${currentMood?.id === mood.id ? 'scale-110 drop-shadow-2xl' : 'group-hover:scale-105'}`} style={{ fill: mood.color }}>
+              {currentMood?.id === mood.id && (
+                <motion.div
+                  layoutId="mood-glow"
+                  className="absolute -inset-6 bg-white/70 rounded-full blur-2xl"
+                />
+              )}
+              <svg
+                viewBox="0 0 200 150"
+                className={`w-28 h-28 md:w-40 md:h-40 drop-shadow-lg transition-all duration-700 relative z-10 ${
+                  currentMood?.id === mood.id ? 'scale-110 drop-shadow-2xl' : 'group-hover:scale-105'
+                }`}
+                style={{ fill: mood.color }}
+              >
                 <path d={mood.path} />
               </svg>
             </div>
-            <span className={`font-sans text-sm md:text-base uppercase tracking-widest transition-all duration-500 ${currentMood?.id === mood.id ? 'text-[#633131] font-bold tracking-[0.3em]' : 'text-[#826454]'}`}>{mood.label}</span>
+            <span
+              className={`font-sans text-sm md:text-base uppercase tracking-widest transition-all duration-500 ${
+                currentMood?.id === mood.id
+                  ? 'text-[#633131] font-bold tracking-[0.3em]'
+                  : 'text-[#826454]'
+              }`}
+            >
+              {mood.label}
+            </span>
           </motion.button>
         ))}
       </div>
 
       <AnimatePresence mode="wait">
         {currentMood && (
-          <motion.div key={currentMood.id} initial={{ opacity: 0, y: 30, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.9 }} className="bg-white/70 backdrop-blur-2xl p-10 md:p-12 rounded-[2.5rem] border border-white max-w-2xl text-center shadow-md relative overflow-hidden mb-12 w-full">
-            <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl opacity-30" style={{ backgroundColor: currentMood.color }} />
-            <p className="font-serif text-2xl md:text-3xl text-[#633131] leading-relaxed relative z-10">"{currentMood.msg}"</p>
+          <motion.div
+            key={currentMood.id}
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="bg-white/70 backdrop-blur-2xl p-10 md:p-12 rounded-[2.5rem] border border-white max-w-2xl text-center shadow-md relative overflow-hidden mb-12 w-full"
+          >
+            <div
+              className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl opacity-30"
+              style={{ backgroundColor: currentMood.color }}
+            />
+            <p className="font-serif text-2xl md:text-3xl text-[#633131] leading-relaxed relative z-10">
+              "{currentMood.msg}"
+            </p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* FEATURE 5: The Memory Jar Trigger */}
-      <motion.button whileHover={{ scale: 1.05 }} onClick={() => setShowMemoryJar(true)} className="bg-gradient-to-r from-[#D4A373]/30 to-[#C69C9C]/30 backdrop-blur-md px-8 py-4 rounded-full border border-white shadow-sm flex items-center gap-3 text-[#633131]">
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        onClick={() => setShowMemoryJar(true)}
+        className="bg-gradient-to-r from-[#D4A373]/30 to-[#C69C9C]/30 backdrop-blur-md px-8 py-4 rounded-full border border-white shadow-sm flex items-center gap-3 text-[#633131]"
+      >
         <Gift size={20} /> <span className="font-serif text-xl">Open the Memory Jar</span>
       </motion.button>
 
-      {/* Breathing Modal */}
       <AnimatePresence>
         {showBreathing && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F9F6F0]/90 backdrop-blur-sm">
-            <button onClick={() => setShowBreathing(false)} className="absolute top-10 right-10 text-[#826454] hover:text-[#2C302E]">Close</button>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#F9F6F0]/90 backdrop-blur-sm"
+          >
+            <button
+              onClick={() => setShowBreathing(false)}
+              className="absolute top-10 right-10 text-[#826454] hover:text-[#2C302E]"
+            >
+              Close
+            </button>
             <h2 className="font-serif text-4xl text-[#633131] mb-12">Breathe with me</h2>
-            <motion.div animate={{ scale: [1, 2, 1], backgroundColor: ['#DCE0D9', '#9CA893', '#DCE0D9'] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} className="w-32 h-32 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(156,168,147,0.5)]" />
-            <motion.p animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }} className="mt-16 font-sans text-xl text-[#826454] tracking-widest uppercase">
+            <motion.div
+              animate={{ scale: [1, 2, 1], backgroundColor: ['#DCE0D9', '#9CA893', '#DCE0D9'] }}
+              transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-32 h-32 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(156,168,147,0.5)]"
+            />
+            <motion.p
+              animate={{ opacity: [0.5, 1, 0.5] }}
+              transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+              className="mt-16 font-sans text-xl text-[#826454] tracking-widest uppercase"
+            >
               Inhale... Exhale...
             </motion.p>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Memory Jar Modal */}
       <AnimatePresence>
         {showMemoryJar && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md px-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-md px-4"
+          >
             <div className="max-w-2xl w-full bg-[#FDFBF7] p-8 md:p-12 rounded-[3rem] border border-[#E5D5D5] shadow-2xl relative flex flex-col items-center">
-              <button onClick={() => setShowMemoryJar(false)} className="absolute top-6 right-6 text-[#826454]">Close</button>
+              <button
+                onClick={() => setShowMemoryJar(false)}
+                className="absolute top-6 right-6 text-[#826454]"
+              >
+                Close
+              </button>
               <h2 className="font-serif text-4xl text-[#633131] mb-2">Memory Jar</h2>
-              <p className="font-sans text-[#826454] text-sm mb-8">Drop a tiny memory in here to keep forever.</p>
-              
-              {/* Visual Jar */}
+              <p className="font-sans text-[#826454] text-sm mb-8">
+                Drop a tiny memory in here to keep forever.
+              </p>
+
               <div className="relative w-48 h-64 border-4 border-white bg-white/20 rounded-b-[3rem] rounded-t-lg shadow-inner mb-8 overflow-hidden flex flex-wrap-reverse content-start p-4 gap-2">
-                <div className="absolute top-0 left-0 w-full h-8 bg-white/40 border-b-4 border-white"></div>
-                {memories.map((m, i) => (
-                  <motion.div key={m.id} initial={{ y: -200, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: "spring", bounce: 0.5 }} className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#D4A373] to-[#C69C9C] shadow-[0_0_10px_rgba(198,156,156,0.6)] group relative">
+                <div className="absolute top-0 left-0 w-full h-8 bg-white/40 border-b-4 border-white" />
+                {memories.map((m) => (
+                  <motion.div
+                    key={m.id}
+                    initial={{ y: -200, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ type: 'spring', bounce: 0.5 }}
+                    className="w-6 h-6 rounded-full bg-gradient-to-tr from-[#D4A373] to-[#C69C9C] shadow-[0_0_10px_rgba(198,156,156,0.6)] group relative"
+                  >
                     <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-48 bg-white text-[#2C302E] text-xs font-sans p-2 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 pointer-events-none z-10 transition-opacity">
                       {m.text}
                     </div>
@@ -537,8 +1044,19 @@ const MoodCorner = ({ currentMood, setAppMood }) => {
               </div>
 
               <form onSubmit={addMemory} className="w-full flex gap-3">
-                <input type="text" value={newMemory} onChange={(e) => setNewMemory(e.target.value)} placeholder="Remember when we..." className="flex-1 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]" />
-                <button type="submit" className="bg-[#9CA893] text-white px-6 py-3 rounded-xl hover:bg-[#8A9682] transition-colors shadow-sm">Save</button>
+                <input
+                  type="text"
+                  value={newMemory}
+                  onChange={(e) => setNewMemory(e.target.value)}
+                  placeholder="Remember when we..."
+                  className="flex-1 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
+                />
+                <button
+                  type="submit"
+                  className="bg-[#9CA893] text-white px-6 py-3 rounded-xl hover:bg-[#8A9682] transition-colors shadow-sm"
+                >
+                  Save
+                </button>
               </form>
             </div>
           </motion.div>
@@ -548,12 +1066,17 @@ const MoodCorner = ({ currentMood, setAppMood }) => {
   );
 };
 
-const TicTacToe = () => {
-  const [board, setBoard] = useState(Array(9).fill(null));
+/* -------------------- Tic Tac Toe -------------------- */
+const TicTacToe: React.FC = () => {
+  const [board, setBoard] = useState<(string | null)[]>(Array(9).fill(null));
   const [isXNext, setIsXNext] = useState(true);
-  
-  const checkWinner = (squares) => {
-    const lines = [[0,1,2], [3,4,5], [6,7,8], [0,3,6], [1,4,7], [2,5,8], [0,4,8], [2,4,6]];
+
+  const checkWinner = (squares: (string | null)[]) => {
+    const lines = [
+      [0, 1, 2], [3, 4, 5], [6, 7, 8],
+      [0, 3, 6], [1, 4, 7], [2, 5, 8],
+      [0, 4, 8], [2, 4, 6],
+    ];
     for (let i = 0; i < lines.length; i++) {
       const [a, b, c] = lines[i];
       if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) return squares[a];
@@ -564,10 +1087,10 @@ const TicTacToe = () => {
   const winner = checkWinner(board);
   const isDraw = !winner && board.every(Boolean);
 
-  const handleClick = (i) => {
+  const handleClick = (i: number) => {
     if (board[i] || winner) return;
     const newBoard = [...board];
-    newBoard[i] = 'H'; // Heart (Player)
+    newBoard[i] = 'H';
     setBoard(newBoard);
     setIsXNext(false);
   };
@@ -575,11 +1098,13 @@ const TicTacToe = () => {
   useEffect(() => {
     if (!isXNext && !winner && !isDraw) {
       const timer = setTimeout(() => {
-        const emptyIndices = board.map((val, idx) => val === null ? idx : null).filter(val => val !== null);
+        const emptyIndices = board
+          .map((val, idx) => (val === null ? idx : null))
+          .filter((val): val is number => val !== null);
         if (emptyIndices.length > 0) {
           const randomIndex = emptyIndices[Math.floor(Math.random() * emptyIndices.length)];
           const newBoard = [...board];
-          newBoard[randomIndex] = 'S'; // Star (Bot)
+          newBoard[randomIndex] = 'S';
           setBoard(newBoard);
           setIsXNext(true);
         }
@@ -593,7 +1118,11 @@ const TicTacToe = () => {
       <h3 className="font-['Caveat'] text-4xl text-[#826454] mb-6">Play a quick game!</h3>
       <div className="grid grid-cols-3 gap-2 bg-[#E5D5D5] p-2 rounded-2xl w-64 h-64 shadow-inner">
         {board.map((cell, i) => (
-          <button key={i} onClick={() => handleClick(i)} className="bg-white rounded-xl flex items-center justify-center text-4xl hover:bg-[#F9F6F0] transition-colors">
+          <button
+            key={i}
+            onClick={() => handleClick(i)}
+            className="bg-white rounded-xl flex items-center justify-center text-4xl hover:bg-[#F9F6F0] transition-colors"
+          >
             {cell === 'H' && <Heart className="text-[#C69C9C] fill-[#C69C9C]" size={40} />}
             {cell === 'S' && <Star className="text-[#9CA893] fill-[#9CA893]" size={40} />}
           </button>
@@ -603,146 +1132,339 @@ const TicTacToe = () => {
         {winner === 'H' ? 'You win! ❤️' : winner === 'S' ? 'Jigar-bot wins! ⭐' : isDraw ? "It's a tie!" : ''}
       </div>
       {(winner || isDraw) && (
-        <button onClick={() => {setBoard(Array(9).fill(null)); setIsXNext(true);}} className="mt-4 px-6 py-2 bg-white/50 border border-[#E5D5D5] rounded-full text-[#826454] hover:bg-white transition-colors">Play Again</button>
+        <button
+          onClick={() => {
+            setBoard(Array(9).fill(null));
+            setIsXNext(true);
+          }}
+          className="mt-4 px-6 py-2 bg-white/50 border border-[#E5D5D5] rounded-full text-[#826454] hover:bg-white transition-colors"
+        >
+          Play Again
+        </button>
       )}
     </div>
   );
 };
 
-const Bubble = () => {
-  const [popped, setPopped] = useState(false);
-  return (
-    <motion.button
-      onClick={() => setPopped(true)}
-      animate={popped ? { scale: 0.8, opacity: 0.2 } : { scale: 1, opacity: 1 }}
-      className={`w-12 h-12 rounded-full border-2 border-white shadow-inner ${popped ? 'bg-transparent' : 'bg-white/80 cursor-pointer relative'}`}
-    >
-      {!popped && <div className="w-2 h-2 bg-white rounded-full absolute top-2 left-2 opacity-60"></div>}
-    </motion.button>
-  );
-};
+/* -------------------- Study Corner -------------------- */
+interface StudyCornerProps {
+  ambientSound: string;
+  setAmbientSound: (sound: string) => void;
+}
 
-const StudyCorner = ({ setAmbientSound }) => {
-  const [tasks, setTasks] = useLocalStorage('sriju_tasks', [{ id: 1, text: "Drink a glass of water", done: false }]);
-  const [newTask, setNewTask] = useState("");
-  const [activeTab, setActiveTab] = useState('focus'); // focus, doodle, pop, game
-  
-  const [mode, setMode] = useState('focus'); 
+const StudyCorner: React.FC<StudyCornerProps> = ({ ambientSound, setAmbientSound }) => {
+  const [tasks, setTasks] = useCloudStorage<TaskItem[]>('sriju_tasks', [
+    { id: 1, text: 'Drink a glass of water', done: false },
+  ]);
+  const [newTask, setNewTask] = useState('');
+  const [activeTab, setActiveTab] = useState<'focus' | 'doodle' | 'pop' | 'game'>('focus');
+
+  const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const alarmFiredRef = useRef(false);
 
   useEffect(() => {
-    let interval;
-    if (isRunning && timeLeft > 0) interval = setInterval(() => setTimeLeft(p => p - 1), 1000);
-    else if (timeLeft === 0) {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => setTimeLeft((p) => p - 1), 1000);
+    } else if (isRunning && timeLeft === 0 && !alarmFiredRef.current) {
+      alarmFiredRef.current = true;
       setIsRunning(false);
-      if (mode === 'focus') { setMode('break'); setTimeLeft(5 * 60); }
-      else { setMode('focus'); setTimeLeft(25 * 60); }
+      playTimerAlarm();
+      if (mode === 'focus') {
+        setMode('break');
+        setTimeLeft(5 * 60);
+      } else {
+        setMode('focus');
+        setTimeLeft(25 * 60);
+      }
+      setTimeout(() => {
+        alarmFiredRef.current = false;
+      }, 1500);
     }
-    return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [isRunning, timeLeft, mode]);
 
-  const toggleTask = (id) => setTasks(tasks.map(t => t.id === id ? { ...t, done: !t.done } : t));
-  const addTask = (e) => {
+  const toggleTask = (id: number) =>
+    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+
+  const addTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTask.trim()) return;
     setTasks([...tasks, { id: Date.now(), text: newTask, done: false }]);
-    setNewTask("");
+    setNewTask('');
   };
-  const formatTime = (secs) => `${Math.floor(secs / 60).toString().padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
-  const switchMode = (newMode) => { setMode(newMode); setIsRunning(false); setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60); };
 
-  // Doodle logic simplified for space
-  const canvasRef = useRef(null);
+  const formatTime = (secs: number) =>
+    `${Math.floor(secs / 60)
+      .toString()
+      .padStart(2, '0')}:${(secs % 60).toString().padStart(2, '0')}`;
+
+  const switchMode = (newMode: 'focus' | 'break') => {
+    setMode(newMode);
+    setIsRunning(false);
+    setTimeLeft(newMode === 'focus' ? 25 * 60 : 5 * 60);
+    alarmFiredRef.current = false;
+  };
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
   useEffect(() => {
-    if(activeTab === 'doodle' && canvasRef.current) {
+    if (activeTab === 'doodle' && canvasRef.current) {
       const canvas = canvasRef.current;
-      canvas.width = canvas.parentElement.clientWidth;
+      canvas.width = canvas.parentElement?.clientWidth ?? 600;
       canvas.height = 400;
-      const ctx = canvas.getContext("2d");
-      ctx.lineCap = "round"; ctx.strokeStyle = "#826454"; ctx.lineWidth = 3;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#826454';
+        ctx.lineWidth = 3;
+      }
     }
   }, [activeTab]);
 
+  const ambientOptions: { id: string; label: string; icon: LucideIcon; color: string }[] = [
+    { id: 'piano',  label: 'Piano',  icon: Music,     color: '#633131' },
+    { id: 'rain',   label: 'Rain',   icon: CloudRain, color: '#2C302E' },
+    { id: 'forest', label: 'Forest', icon: Trees,     color: '#9CA893' },
+    { id: 'lofi',   label: 'Lofi',   icon: Music,     color: '#C69C9C' },
+    { id: 'cafe',   label: 'Cafe',   icon: Coffee,    color: '#D4A373' },
+    { id: 'night',  label: 'Night',  icon: Moon,      color: '#633131' },
+    { id: 'ocean',  label: 'Ocean',  icon: Droplet,   color: '#84A59D' },
+  ];
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-6xl mx-auto px-4 py-8 relative z-10">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-6xl mx-auto px-4 py-8 relative z-10"
+    >
       <div className="text-center mb-10">
         <h2 className="font-serif text-4xl md:text-5xl text-[#2C302E]">Study Desk</h2>
         <div className="flex flex-wrap justify-center gap-4 mt-6">
-          <button onClick={() => setActiveTab('focus')} className={`px-4 py-2 rounded-full font-sans text-sm transition ${activeTab==='focus'?'bg-[#826454] text-white':'bg-white/50 text-[#826454]'}`}>Focus</button>
-          <button onClick={() => setActiveTab('doodle')} className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${activeTab==='doodle'?'bg-[#C69C9C] text-white':'bg-white/50 text-[#826454]'}`}><PenTool size={14}/> Doodle</button>
-          <button onClick={() => setActiveTab('pop')} className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${activeTab==='pop'?'bg-[#9CA893] text-white':'bg-white/50 text-[#826454]'}`}><CircleDashed size={14}/> Bubble Wrap</button>
-          <button onClick={() => setActiveTab('game')} className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${activeTab==='game'?'bg-[#D4A373] text-white':'bg-white/50 text-[#826454]'}`}><Gamepad2 size={14}/> Mini Game</button>
+          <button
+            onClick={() => setActiveTab('focus')}
+            className={`px-4 py-2 rounded-full font-sans text-sm transition ${
+              activeTab === 'focus' ? 'bg-[#826454] text-white' : 'bg-white/50 text-[#826454]'
+            }`}
+          >
+            Focus
+          </button>
+          <button
+            onClick={() => setActiveTab('doodle')}
+            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
+              activeTab === 'doodle' ? 'bg-[#C69C9C] text-white' : 'bg-white/50 text-[#826454]'
+            }`}
+          >
+            <PenTool size={14} /> Doodle
+          </button>
+          <button
+            onClick={() => setActiveTab('pop')}
+            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
+              activeTab === 'pop' ? 'bg-[#9CA893] text-white' : 'bg-white/50 text-[#826454]'
+            }`}
+          >
+            <CircleDashed size={14} /> Bubble Wrap
+          </button>
+          <button
+            onClick={() => setActiveTab('game')}
+            className={`px-4 py-2 rounded-full font-sans text-sm transition flex items-center gap-2 ${
+              activeTab === 'game' ? 'bg-[#D4A373] text-white' : 'bg-white/50 text-[#826454]'
+            }`}
+          >
+            <Gamepad2 size={14} /> Mini Game
+          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Tasks + Ambient Audio Controls */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white/60 backdrop-blur-xl p-8 rounded-[2rem] border border-white/50 shadow-sm">
-            <h3 className="font-serif text-2xl text-[#633131] mb-6 flex items-center gap-2"><Coffee size={24} /> To-Do List</h3>
+            <h3 className="font-serif text-2xl text-[#633131] mb-6 flex items-center gap-2">
+              <Coffee size={24} /> To-Do List
+            </h3>
             <div className="space-y-4 mb-6">
               <AnimatePresence>
-                {tasks.map(task => (
-                  <motion.div key={task.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="flex items-center gap-3 group">
-                    <button onClick={() => toggleTask(task.id)} className="text-[#9CA893] hover:text-[#633131]"><CheckCircle size={20} className={task.done?'fill-[#9CA893]/20':''} /></button>
-                    <span className={`flex-1 font-sans text-sm ${task.done ? 'line-through text-[#826454]/40' : 'text-[#2C302E]'}`}>{task.text}</span>
-                    <button onClick={() => setTasks(tasks.filter(t => t.id !== task.id))} className="text-[#826454]/0 group-hover:text-red-400 hover:!text-red-500"><Trash2 size={16} /></button>
+                {tasks.map((task) => (
+                  <motion.div
+                    key={task.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="flex items-center gap-3 group"
+                  >
+                    <button
+                      onClick={() => toggleTask(task.id)}
+                      className="text-[#9CA893] hover:text-[#633131]"
+                    >
+                      <CheckCircle size={20} className={task.done ? 'fill-[#9CA893]/20' : ''} />
+                    </button>
+                    <span
+                      className={`flex-1 font-sans text-sm ${
+                        task.done ? 'line-through text-[#826454]/40' : 'text-[#2C302E]'
+                      }`}
+                    >
+                      {task.text}
+                    </span>
+                    <button
+                      onClick={() => setTasks(tasks.filter((t) => t.id !== task.id))}
+                      className="text-[#826454]/0 group-hover:text-red-400 hover:!text-red-500"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </motion.div>
                 ))}
               </AnimatePresence>
             </div>
             <form onSubmit={addTask} className="flex gap-2">
-              <input type="text" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Add a task..." className="flex-1 bg-white/50 border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none" />
-              <button type="submit" className="bg-[#C69C9C] text-white p-3 rounded-xl hover:bg-[#B58B8B]"><Plus size={20} /></button>
+              <input
+                type="text"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                placeholder="Add a task..."
+                className="flex-1 bg-white/50 border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none"
+              />
+              <button
+                type="submit"
+                className="bg-[#C69C9C] text-white p-3 rounded-xl hover:bg-[#B58B8B]"
+              >
+                <Plus size={20} />
+              </button>
             </form>
           </div>
 
-          {/* FEATURE 10: Zen Sounds Control Panel */}
           <div className="bg-[#F5E6E6]/60 backdrop-blur-xl p-6 rounded-[2rem] border border-white/50 shadow-sm">
-             <h3 className="font-sans uppercase tracking-widest text-xs text-[#826454] mb-4 flex items-center gap-2"><Volume2 size={14}/> Zen Sounds</h3>
-             <div className="grid grid-cols-3 gap-2">
-               <button onClick={() => setAmbientSound('piano')} className="bg-white/60 p-3 rounded-xl flex flex-col items-center gap-2 hover:bg-white text-[#633131] transition"><Music size={18}/> <span className="text-[10px]">Piano</span></button>
-               <button onClick={() => setAmbientSound('rain')} className="bg-white/60 p-3 rounded-xl flex flex-col items-center gap-2 hover:bg-white text-[#2C302E] transition"><CloudRain size={18}/> <span className="text-[10px]">Rain</span></button>
-               <button onClick={() => setAmbientSound('forest')} className="bg-white/60 p-3 rounded-xl flex flex-col items-center gap-2 hover:bg-white text-[#9CA893] transition"><Trees size={18}/> <span className="text-[10px]">Forest</span></button>
-             </div>
+            <h3 className="font-sans uppercase tracking-widest text-xs text-[#826454] mb-4 flex items-center gap-2">
+              <Volume2 size={14} /> Zen Sounds
+            </h3>
+            <div className="grid grid-cols-3 gap-2">
+              {ambientOptions.map(({ id, label, icon: Icon, color }) => {
+                const isActive = ambientSound === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setAmbientSound(id)}
+                    className={`p-3 rounded-xl flex flex-col items-center gap-2 transition-all ${
+                      isActive
+                        ? 'bg-[#C69C9C] text-white shadow-md scale-[1.03]'
+                        : 'bg-white/60 hover:bg-white text-[#633131]'
+                    }`}
+                  >
+                    <Icon size={18} style={{ color: isActive ? undefined : color }} />
+                    <span className="text-[10px] font-sans">{label}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Right Col: Dynamic Content */}
-        <div className="lg:col-span-2 bg-[#F9F6F0]/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-[#E5D5D5] shadow-sm min-h-[500px] flex flex-col items-center justify-center relative overflow-hidden" style={{ backgroundImage: 'radial-gradient(#E5D5D5 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+        <div
+          className="lg:col-span-2 bg-[#F9F6F0]/80 backdrop-blur-md p-8 rounded-[2.5rem] border border-[#E5D5D5] shadow-sm min-h-[500px] flex flex-col items-center justify-center relative overflow-hidden"
+          style={{
+            backgroundImage: 'radial-gradient(#E5D5D5 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }}
+        >
           {activeTab === 'focus' && (
             <div className="text-center w-full">
               <div className="flex justify-center gap-4 mb-8">
-                <button onClick={() => switchMode('focus')} className={`font-sans text-sm px-6 py-2 rounded-full transition-colors ${mode === 'focus' ? 'bg-[#9CA893] text-white shadow-md' : 'text-[#826454] hover:bg-white/50'}`}>Focus</button>
-                <button onClick={() => switchMode('break')} className={`font-sans text-sm px-6 py-2 rounded-full transition-colors ${mode === 'break' ? 'bg-[#C69C9C] text-white shadow-md' : 'text-[#826454] hover:bg-white/50'}`}>Break</button>
+                <button
+                  onClick={() => switchMode('focus')}
+                  className={`font-sans text-sm px-6 py-2 rounded-full transition-colors ${
+                    mode === 'focus' ? 'bg-[#9CA893] text-white shadow-md' : 'text-[#826454] hover:bg-white/50'
+                  }`}
+                >
+                  Focus
+                </button>
+                <button
+                  onClick={() => switchMode('break')}
+                  className={`font-sans text-sm px-6 py-2 rounded-full transition-colors ${
+                    mode === 'break' ? 'bg-[#C69C9C] text-white shadow-md' : 'text-[#826454] hover:bg-white/50'
+                  }`}
+                >
+                  Break
+                </button>
               </div>
-              <div className="w-64 h-64 mx-auto rounded-full border-[8px] flex items-center justify-center transition-colors duration-1000 mb-8" style={{ borderColor: mode === 'focus' ? '#9CA893' : '#C69C9C' }}>
-                 <span className="font-serif text-6xl text-[#2C302E]">{formatTime(timeLeft)}</span>
+              <div
+                className="w-64 h-64 mx-auto rounded-full border-[8px] flex items-center justify-center transition-colors duration-1000 mb-8"
+                style={{ borderColor: mode === 'focus' ? '#9CA893' : '#C69C9C' }}
+              >
+                <span className="font-serif text-6xl text-[#2C302E]">{formatTime(timeLeft)}</span>
               </div>
-              <button onClick={() => setIsRunning(!isRunning)} className="px-12 py-4 text-white rounded-full font-sans font-medium text-lg bg-[#826454] hover:bg-[#633131] transition-colors shadow-md">
+              <button
+                onClick={() => setIsRunning(!isRunning)}
+                className="px-12 py-4 text-white rounded-full font-sans font-medium text-lg bg-[#826454] hover:bg-[#633131] transition-colors shadow-md"
+              >
                 {isRunning ? 'Pause' : 'Start'}
               </button>
+              <p className="font-sans text-xs text-[#826454] mt-4 opacity-70">
+                🔔 Alarm will chime when the timer hits zero.
+              </p>
             </div>
           )}
+
           {activeTab === 'doodle' && (
             <div className="w-full h-full flex flex-col cursor-crosshair">
               <div className="flex justify-between items-center mb-4 w-full">
                 <h3 className="font-['Caveat'] text-3xl text-[#826454]">Draw something cute...</h3>
-                <button onClick={() => {const ctx = canvasRef.current.getContext("2d"); ctx.clearRect(0,0,canvasRef.current.width, canvasRef.current.height);}} className="text-sm font-sans text-[#C69C9C] hover:underline">Clear</button>
+                <button
+                  onClick={() => {
+                    const ctx = canvasRef.current?.getContext('2d');
+                    if (ctx && canvasRef.current) {
+                      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                    }
+                  }}
+                  className="text-sm font-sans text-[#C69C9C] hover:underline"
+                >
+                  Clear
+                </button>
               </div>
-              <canvas ref={canvasRef} onMouseDown={({nativeEvent})=>{const ctx=canvasRef.current.getContext("2d"); ctx.beginPath(); ctx.moveTo(nativeEvent.offsetX, nativeEvent.offsetY); setIsDrawing(true);}} onMouseMove={({nativeEvent})=>{if(!isDrawing)return; const ctx=canvasRef.current.getContext("2d"); ctx.lineTo(nativeEvent.offsetX, nativeEvent.offsetY); ctx.stroke();}} onMouseUp={()=>{const ctx=canvasRef.current.getContext("2d"); ctx.closePath(); setIsDrawing(false);}} onMouseLeave={()=>{const ctx=canvasRef.current.getContext("2d"); ctx.closePath(); setIsDrawing(false);}} className="w-full h-[400px] bg-white/50 border-2 border-dashed border-[#E5D5D5] rounded-xl" />
+              <canvas
+                ref={canvasRef}
+                onMouseDown={({ nativeEvent }) => {
+                  const ctx = canvasRef.current?.getContext('2d');
+                  if (!ctx) return;
+                  ctx.beginPath();
+                  ctx.moveTo(nativeEvent.offsetX, nativeEvent.offsetY);
+                  setIsDrawing(true);
+                }}
+                onMouseMove={({ nativeEvent }) => {
+                  if (!isDrawing) return;
+                  const ctx = canvasRef.current?.getContext('2d');
+                  if (!ctx) return;
+                  ctx.lineTo(nativeEvent.offsetX, nativeEvent.offsetY);
+                  ctx.stroke();
+                }}
+                onMouseUp={() => {
+                  canvasRef.current?.getContext('2d')?.closePath();
+                  setIsDrawing(false);
+                }}
+                onMouseLeave={() => {
+                  canvasRef.current?.getContext('2d')?.closePath();
+                  setIsDrawing(false);
+                }}
+                className="w-full h-[400px] bg-white/50 border-2 border-dashed border-[#E5D5D5] rounded-xl"
+              />
             </div>
           )}
+
           {activeTab === 'pop' && (
             <div className="w-full h-full flex flex-col items-center">
-               <h3 className="font-['Caveat'] text-3xl text-[#826454] mb-6">Pop to release stress!</h3>
-               <div className="flex flex-wrap gap-2 justify-center max-w-md">
-                 {Array.from({length: 42}).map((_, i) => <Bubble key={i} />)}
-               </div>
+              <h3 className="font-['Caveat'] text-3xl text-[#826454] mb-6">Pop to release stress!</h3>
+              <div className="flex flex-wrap gap-2 justify-center max-w-md">
+                {Array.from({ length: 42 }).map((_, i) => (
+                  <BubbleWrap key={i} />
+                ))}
+              </div>
             </div>
           )}
+
           {activeTab === 'game' && <TicTacToe />}
         </div>
       </div>
@@ -750,13 +1472,31 @@ const StudyCorner = ({ setAmbientSound }) => {
   );
 };
 
-const FinanceCorner = () => {
-  const [budget, setBudget] = useLocalStorage('sriju_budget_npr', 15000);
-  const [savingsGoal, setSavingsGoal] = useLocalStorage('sriju_goal_npr', 5000);
-  const [expenses, setExpenses] = useLocalStorage('sriju_expenses_npr', []);
-  
-  const [newExpName, setNewExpName] = useState("");
-  const [newExpAmount, setNewExpAmount] = useState("");
+const BubbleWrap: React.FC = () => {
+  const [popped, setPopped] = useState(false);
+  return (
+    <motion.button
+      onClick={() => setPopped(true)}
+      animate={popped ? { scale: 0.8, opacity: 0.2 } : { scale: 1, opacity: 1 }}
+      className={`w-12 h-12 rounded-full border-2 border-white shadow-inner ${
+        popped ? 'bg-transparent' : 'bg-white/80 cursor-pointer relative'
+      }`}
+    >
+      {!popped && (
+        <div className="w-2 h-2 bg-white rounded-full absolute top-2 left-2 opacity-60" />
+      )}
+    </motion.button>
+  );
+};
+
+/* -------------------- Finance Corner -------------------- */
+const FinanceCorner: React.FC = () => {
+  const [budget, setBudget] = useCloudStorage<number>('sriju_budget_npr', 15000);
+  const [savingsGoal, setSavingsGoal] = useCloudStorage<number>('sriju_goal_npr', 5000);
+  const [expenses, setExpenses] = useCloudStorage<ExpenseItem[]>('sriju_expenses_npr', []);
+
+  const [newExpName, setNewExpName] = useState('');
+  const [newExpAmount, setNewExpAmount] = useState('');
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [tempBudget, setTempBudget] = useState(budget);
   const [tempGoal, setTempGoal] = useState(savingsGoal);
@@ -765,58 +1505,119 @@ const FinanceCorner = () => {
   const remaining = Math.max(0, budget - spent);
   const fillPercentage = Math.min(100, (remaining / (savingsGoal || 1)) * 100) || 0;
 
-  const addExpense = (e) => {
+  const addExpense = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newExpName || !newExpAmount || isNaN(newExpAmount)) return;
-    setExpenses([{ id: Date.now(), name: newExpName, amount: parseFloat(newExpAmount) }, ...expenses]);
-    setNewExpName(""); setNewExpAmount("");
+    if (!newExpName || !newExpAmount || isNaN(Number(newExpAmount))) return;
+    setExpenses([
+      { id: Date.now(), name: newExpName, amount: parseFloat(newExpAmount) },
+      ...expenses,
+    ]);
+    setNewExpName('');
+    setNewExpAmount('');
   };
-  const removeExpense = (id) => setExpenses(expenses.filter(e => e.id !== id));
+  const removeExpense = (id: number) => setExpenses(expenses.filter((e) => e.id !== id));
   const saveSettings = () => {
-    if(tempBudget > 0) setBudget(tempBudget);
-    if(tempGoal > 0) setSavingsGoal(tempGoal);
+    if (tempBudget > 0) setBudget(tempBudget);
+    if (tempGoal > 0) setSavingsGoal(tempGoal);
     setIsEditingSettings(false);
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-5xl mx-auto px-4 py-12 relative z-10">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-5xl mx-auto px-4 py-12 relative z-10"
+    >
       <div className="text-center mb-12">
         <h2 className="font-serif text-4xl md:text-5xl text-[#2C302E] mb-4">The Money Jar</h2>
-        <p className="font-sans text-[#826454] text-lg">Little by little. Future Sriju is going to thank you.</p>
+        <p className="font-sans text-[#826454] text-lg">
+          Little by little. Future Sriju is going to thank you.
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         <div className="lg:col-span-5 flex flex-col items-center justify-center bg-white/40 backdrop-blur-xl p-10 rounded-[3rem] border border-white/60 shadow-sm relative overflow-hidden">
           <AnimatePresence>
             {isEditingSettings && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute inset-0 bg-white/95 z-20 flex flex-col items-center justify-center p-8 rounded-[3rem]">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="absolute inset-0 bg-white/95 z-20 flex flex-col items-center justify-center p-8 rounded-[3rem]"
+              >
                 <h3 className="font-serif text-2xl mb-6 text-[#633131]">Set Your Targets (NPR)</h3>
                 <div className="space-y-4 w-full max-w-xs">
                   <div>
-                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">Monthly Budget (Rs.)</label>
-                    <input type="number" value={tempBudget} onChange={e => setTempBudget(Number(e.target.value))} className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none" />
+                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">
+                      Monthly Budget (Rs.)
+                    </label>
+                    <input
+                      type="number"
+                      value={tempBudget}
+                      onChange={(e) => setTempBudget(Number(e.target.value))}
+                      className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none"
+                    />
                   </div>
                   <div>
-                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">Savings Goal (Rs.)</label>
-                    <input type="number" value={tempGoal} onChange={e => setTempGoal(Number(e.target.value))} className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none" />
+                    <label className="text-xs font-sans uppercase tracking-wider text-[#826454] block mb-1">
+                      Savings Goal (Rs.)
+                    </label>
+                    <input
+                      type="number"
+                      value={tempGoal}
+                      onChange={(e) => setTempGoal(Number(e.target.value))}
+                      className="w-full bg-[#F9F6F0] border border-[#E5D5D5] rounded-xl px-4 py-3 font-serif text-xl outline-none"
+                    />
                   </div>
-                  <button onClick={saveSettings} className="w-full bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium">Save Changes</button>
+                  <button
+                    onClick={saveSettings}
+                    className="w-full bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium"
+                  >
+                    Save Changes
+                  </button>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
-          <button onClick={() => setIsEditingSettings(true)} className="absolute top-6 right-6 p-2 text-[#826454] hover:bg-white/50 rounded-full z-10"><Edit2 size={20} /></button>
+          <button
+            onClick={() => setIsEditingSettings(true)}
+            className="absolute top-6 right-6 p-2 text-[#826454] hover:bg-white/50 rounded-full z-10"
+          >
+            <Edit2 size={20} />
+          </button>
 
           <div className="relative w-64 h-80 mb-8 mt-4">
             <svg viewBox="0 0 100 150" className="w-full h-full drop-shadow-2xl relative z-10">
-              <path d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z" fill="rgba(255,255,255,0.4)" stroke="#C69C9C" strokeWidth="2" />
+              <path
+                d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z"
+                fill="rgba(255,255,255,0.4)"
+                stroke="#C69C9C"
+                strokeWidth="2"
+              />
               <rect x="25" y="5" width="50" height="10" rx="3" fill="#826454" />
-              <g clipPath="url(#jar-clip)"><rect x="0" y={150 - (fillPercentage * 1.2)} width="100" height="150" fill="#9CA893" opacity="0.85" className="transition-all duration-1000 ease-in-out" /></g>
-              <clipPath id="jar-clip"><path d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z" /></clipPath>
+              <clipPath id="jar-clip">
+                <path d="M30 10 L70 10 L70 20 L85 30 L85 140 Q85 150 70 150 L30 150 Q15 150 15 140 L15 30 L30 20 Z" />
+              </clipPath>
+              <g clipPath="url(#jar-clip)">
+                <rect
+                  x="0"
+                  y={150 - fillPercentage * 1.2}
+                  width="100"
+                  height="150"
+                  fill="#9CA893"
+                  opacity="0.85"
+                  className="transition-all duration-1000 ease-in-out"
+                />
+              </g>
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-12 z-20">
-              <span className="font-serif text-[#633131] text-sm opacity-90 mb-1 bg-white/40 px-3 rounded-full backdrop-blur-sm">Current Savings</span>
-              <span className="font-sans font-bold text-[#2C302E] drop-shadow-md text-3xl mt-1">Rs. {remaining.toLocaleString()}</span>
+              <span className="font-serif text-[#633131] text-sm opacity-90 mb-1 bg-white/40 px-3 rounded-full backdrop-blur-sm">
+                Current Savings
+              </span>
+              <span className="font-sans font-bold text-[#2C302E] drop-shadow-md text-3xl mt-1">
+                Rs. {remaining.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -825,26 +1626,63 @@ const FinanceCorner = () => {
           <div className="flex justify-between items-end mb-8 border-b border-[#E5D5D5] pb-6">
             <h3 className="font-serif text-3xl text-[#633131]">Expense Log</h3>
             <div className="text-right">
-              <span className="text-sm font-sans uppercase tracking-widest text-[#826454] block mb-1">Total Spent</span>
-              <span className="font-serif text-2xl text-[#2C302E]">Rs. {spent.toLocaleString()}</span>
+              <span className="text-sm font-sans uppercase tracking-widest text-[#826454] block mb-1">
+                Total Spent
+              </span>
+              <span className="font-serif text-2xl text-[#2C302E]">
+                Rs. {spent.toLocaleString()}
+              </span>
             </div>
           </div>
-          <form onSubmit={addExpense} className="flex gap-3 mb-8 bg-[#FDFBF7] p-3 rounded-2xl border border-[#E5D5D5]">
-            <input type="text" value={newExpName} onChange={e => setNewExpName(e.target.value)} placeholder="What did you buy?" className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none" />
+          <form
+            onSubmit={addExpense}
+            className="print-hide flex gap-3 mb-8 bg-[#FDFBF7] p-3 rounded-2xl border border-[#E5D5D5]"
+          >
+            <input
+              type="text"
+              value={newExpName}
+              onChange={(e) => setNewExpName(e.target.value)}
+              placeholder="What did you buy?"
+              className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none"
+            />
             <div className="flex items-center bg-white border border-[#E5D5D5] rounded-xl px-4 w-32">
               <span className="text-[#826454] text-sm">Rs.</span>
-              <input type="number" value={newExpAmount} onChange={e => setNewExpAmount(e.target.value)} placeholder="0" className="w-full bg-transparent py-2 pl-2 font-sans text-base outline-none" />
+              <input
+                type="number"
+                value={newExpAmount}
+                onChange={(e) => setNewExpAmount(e.target.value)}
+                placeholder="0"
+                className="w-full bg-transparent py-2 pl-2 font-sans text-base outline-none"
+              />
             </div>
-            <button type="submit" className="bg-[#C69C9C] text-white p-3 px-6 rounded-xl hover:bg-[#B58B8B]"><Plus size={18} /></button>
+            <button
+              type="submit"
+              className="bg-[#C69C9C] text-white p-3 px-6 rounded-xl hover:bg-[#B58B8B]"
+            >
+              <Plus size={18} />
+            </button>
           </form>
           <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
             <AnimatePresence>
-              {expenses.map(exp => (
-                <motion.div key={exp.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="flex justify-between items-center p-4 hover:bg-[#F9F6F0] bg-white/50 rounded-2xl group border border-transparent hover:border-[#E5D5D5]">
+              {expenses.map((exp) => (
+                <motion.div
+                  key={exp.id}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex justify-between items-center p-4 hover:bg-[#F9F6F0] bg-white/50 rounded-2xl group border border-transparent hover:border-[#E5D5D5]"
+                >
                   <span className="font-sans text-lg text-[#2C302E]">{exp.name}</span>
                   <div className="flex items-center gap-6">
-                    <span className="font-serif text-xl text-[#633131]">Rs. {exp.amount.toLocaleString()}</span>
-                    <button onClick={() => removeExpense(exp.id)} className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 transition-all"><Trash2 size={18} /></button>
+                    <span className="font-serif text-xl text-[#633131]">
+                      Rs. {exp.amount.toLocaleString()}
+                    </span>
+                    <button
+                      onClick={() => removeExpense(exp.id)}
+                      className="p-2 rounded-full text-[#826454]/30 hover:text-red-500 transition-all"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </motion.div>
               ))}
@@ -856,146 +1694,513 @@ const FinanceCorner = () => {
   );
 };
 
-const StoryTimeline = () => {
-  const [bucketList, setBucketList] = useLocalStorage('sriju_bucket', BUCKET_LIST);
-  const toggleBucket = (id) => setBucketList(bucketList.map(item => item.id === id ? {...item, done: !item.done} : item));
-  
-  const [mixtape, setMixtape] = useLocalStorage('sriju_mixtape', [{ id: 1, title: "Tum Se Hi", artist: "Mohit Chauhan", note: "The song that always plays when I think of you." }]);
-  const [newSongTitle, setNewSongTitle] = useState("");
-  const [newSongNote, setNewSongNote] = useState("");
+/* -------------------- Story Timeline (mixtape removed) -------------------- */
+const StoryTimeline: React.FC = () => {
+  const [bucketList, setBucketList] = useCloudStorage<BucketItem[]>('sriju_bucket', BUCKET_LIST);
+  const toggleBucket = (id: number) =>
+    setBucketList(bucketList.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
 
-  const addSong = (e) => {
+  const [customMemories, setCustomMemories] = useCloudStorage<CustomMemory[]>('sriju_new_memories', []);
+  const [showAddMemory, setShowAddMemory] = useState(false);
+  const [memDate, setMemDate] = useState('');
+  const [memTitle, setMemTitle] = useState('');
+  const [memText, setMemText] = useState('');
+
+  const addMemory = (e: React.FormEvent) => {
     e.preventDefault();
-    if(!newSongTitle) return;
-    setMixtape([...mixtape, { id: Date.now(), title: newSongTitle, artist: "Us", note: newSongNote }]);
-    setNewSongTitle(""); setNewSongNote("");
+    if (!memTitle.trim() || !memText.trim()) return;
+    setCustomMemories([
+      ...customMemories,
+      {
+        id: Date.now(),
+        date:
+          memDate.trim() ||
+          new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        title: memTitle.trim(),
+        text: memText.trim(),
+      },
+    ]);
+    setMemDate('');
+    setMemTitle('');
+    setMemText('');
+    setShowAddMemory(false);
   };
 
+  const removeCustomMemory = (id: number) =>
+    setCustomMemories(customMemories.filter((m) => m.id !== id));
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-4xl mx-auto px-4 py-16 relative z-10">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-4xl mx-auto px-4 py-16 relative z-10"
+    >
       <div className="text-center mb-24">
-        <h2 className="font-serif text-4xl md:text-6xl text-[#2C302E] mb-6 tracking-wide drop-shadow-sm">The Story We Keep Writing</h2>
-        <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#C69C9C] to-transparent mx-auto"></div>
+        <h2 className="font-serif text-4xl md:text-6xl text-[#2C302E] mb-6 tracking-wide drop-shadow-sm">
+          The Story We Keep Writing
+        </h2>
+        <div className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#C69C9C] to-transparent mx-auto" />
       </div>
 
       <div className="relative border-l-[3px] border-[#C69C9C]/30 ml-6 md:ml-20 space-y-24 mb-32">
         {TIMELINE.map((item, index) => (
-          <motion.div key={index} initial={{ opacity: 0, x: -40, filter: 'blur(4px)' }} whileInView={{ opacity: 1, x: 0, filter: 'blur(0px)' }} viewport={{ once: true, margin: "-150px" }} transition={{ duration: 1, type: "spring" }} className="relative pl-10 md:pl-16 group">
-            <div className="absolute -left-[11.5px] top-2 w-5 h-5 rounded-full bg-[#FDFBF7] border-[3px] border-[#C69C9C] group-hover:bg-[#C69C9C] group-hover:scale-150 transition-all duration-700"></div>
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: -40, filter: 'blur(4px)' }}
+            whileInView={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+            viewport={{ once: true, margin: '-150px' }}
+            transition={{ duration: 1, type: 'spring' }}
+            className="relative pl-10 md:pl-16 group"
+          >
+            <div className="absolute -left-[11.5px] top-2 w-5 h-5 rounded-full bg-[#FDFBF7] border-[3px] border-[#C69C9C] group-hover:bg-[#C69C9C] group-hover:scale-150 transition-all duration-700" />
             <div className="bg-white/70 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] border border-[#E5D5D5] shadow-sm hover:shadow-md transition-all duration-500 hover:-translate-y-2">
-              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">{item.date}</span>
+              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">
+                {item.date}
+              </span>
               <h3 className="font-serif text-3xl text-[#633131] mb-5">{item.title}</h3>
-              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">{item.text}</p>
+              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">
+                {item.text}
+              </p>
             </div>
           </motion.div>
         ))}
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Bucket List */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-[#FDFBF7] p-8 md:p-10 rounded-[3rem] border border-[#E5D5D5] shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-[#9CA893] rounded-full blur-[100px] opacity-10"></div>
-          <h2 className="font-serif text-3xl text-[#2C302E] mb-2">Our Bucket List</h2>
-          <p className="font-sans text-[#826454] mb-8 text-sm">Things we still need to do.</p>
-          <div className="space-y-4">
-            {bucketList.map(item => (
-              <div key={item.id} onClick={() => toggleBucket(item.id)} className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/60 cursor-pointer transition-colors border border-transparent hover:border-[#E5D5D5]">
-                <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${item.done ? 'bg-[#9CA893] border-[#9CA893]' : 'border-[#C69C9C]'}`}>
-                  {item.done && <CheckCircle size={14} className="text-white" />}
-                </div>
-                <span className={`font-sans text-base ${item.done ? 'text-[#826454]/50 line-through' : 'text-[#4A4343]'}`}>{item.text}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* FEATURE 7: Our Mixtape */}
-        <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-[#2C302E] p-8 md:p-10 rounded-[3rem] shadow-xl relative overflow-hidden text-[#FDFBF7] border border-[#4A4343]">
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: noiseSvg }} />
-          <div className="relative z-10 flex flex-col h-full">
-            <h2 className="font-serif text-3xl mb-2 flex items-center gap-3"><Music className="text-[#C69C9C]" /> Our Mixtape</h2>
-            <p className="font-sans text-[#A3B18A] text-sm mb-8">Songs that belong to us.</p>
-            <div className="space-y-4 flex-1 overflow-y-auto custom-scrollbar pr-2">
-              {mixtape.map(song => (
-                <div key={song.id} className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors">
-                  <p className="font-sans font-bold text-lg text-white">{song.title}</p>
-                  <p className="font-['Caveat'] text-xl text-[#C69C9C] mt-2 opacity-90">"{song.note}"</p>
-                </div>
-              ))}
+        {customMemories.map((item) => (
+          <motion.div
+            key={item.id}
+            initial={{ opacity: 0, x: -40, filter: 'blur(4px)' }}
+            whileInView={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+            viewport={{ once: true, margin: '-150px' }}
+            transition={{ duration: 1, type: 'spring' }}
+            className="relative pl-10 md:pl-16 group"
+          >
+            <div className="absolute -left-[11.5px] top-2 w-5 h-5 rounded-full bg-[#FDFBF7] border-[3px] border-[#9CA893] group-hover:bg-[#9CA893] group-hover:scale-150 transition-all duration-700" />
+            <div className="bg-[#F9FBF7]/70 backdrop-blur-xl p-8 md:p-12 rounded-[2.5rem] border border-[#DCE6D6] shadow-sm hover:shadow-md transition-all duration-500 hover:-translate-y-2 relative">
+              <button
+                onClick={() => removeCustomMemory(item.id)}
+                className="absolute top-6 right-6 p-2 rounded-full text-[#826454]/30 hover:text-red-500 hover:bg-white/60 transition-all opacity-0 group-hover:opacity-100"
+                aria-label="Remove this memory"
+              >
+                <Trash2 size={16} />
+              </button>
+              <span className="font-sans text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-[#9CA893] block mb-4">
+                {item.date}
+              </span>
+              <h3 className="font-serif text-3xl text-[#633131] mb-5">{item.title}</h3>
+              <p className="font-sans text-[#4A4343] leading-loose text-base md:text-lg opacity-90">
+                {item.text}
+              </p>
             </div>
-            <form onSubmit={addSong} className="mt-6 flex flex-col gap-2">
-              <input type="text" value={newSongTitle} onChange={e => setNewSongTitle(e.target.value)} placeholder="Song name..." className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C]" />
-              <input type="text" value={newSongNote} onChange={e => setNewSongNote(e.target.value)} placeholder="Why is it our song?" className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C]" />
-              <button type="submit" className="bg-[#C69C9C] text-white py-2 rounded-xl mt-2 font-sans font-medium hover:bg-[#B58B8B] transition-colors">Add to Tape</button>
-            </form>
-          </div>
-        </motion.div>
+          </motion.div>
+        ))}
+
+        <div className="print-hide relative pl-10 md:pl-16">
+          <div className="absolute -left-[11.5px] top-2 w-5 h-5 rounded-full bg-[#FDFBF7] border-[3px] border-dashed border-[#C69C9C]/60" />
+          <button
+            onClick={() => setShowAddMemory(true)}
+            className="w-full flex items-center justify-center gap-3 p-8 rounded-[2.5rem] border-2 border-dashed border-[#C69C9C]/40 text-[#826454] hover:border-[#C69C9C] hover:text-[#633131] hover:bg-white/40 transition-all font-sans"
+          >
+            <Plus size={20} /> Add a new memory
+          </button>
+        </div>
       </div>
+
+      <AnimatePresence>
+        {showAddMemory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          >
+            <motion.form
+              onSubmit={addMemory}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#FDFBF7] w-full max-w-lg p-8 md:p-10 rounded-[2.5rem] border border-[#E5D5D5] shadow-2xl"
+            >
+              <h3 className="font-serif text-2xl text-[#633131] mb-6">Add a new memory</h3>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  value={memDate}
+                  onChange={(e) => setMemDate(e.target.value)}
+                  placeholder="Date (optional — defaults to today)"
+                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
+                />
+                <input
+                  type="text"
+                  value={memTitle}
+                  onChange={(e) => setMemTitle(e.target.value)}
+                  placeholder="Title (e.g. 'Our first road trip')"
+                  className="w-full bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none focus:border-[#C69C9C]"
+                  required
+                />
+                <textarea
+                  value={memText}
+                  onChange={(e) => setMemText(e.target.value)}
+                  placeholder="What happened..."
+                  className="w-full h-28 bg-white border border-[#E5D5D5] rounded-xl px-4 py-3 font-sans text-sm outline-none resize-none focus:border-[#C69C9C]"
+                  required
+                />
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemory(false)}
+                  className="flex-1 py-3 rounded-xl font-sans text-sm text-[#826454] hover:bg-[#F0EBE1] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 bg-[#9CA893] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#87977E] transition-colors"
+                >
+                  Save memory
+                </button>
+              </div>
+            </motion.form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="max-w-2xl mx-auto bg-[#FDFBF7] p-8 md:p-10 rounded-[3rem] border border-[#E5D5D5] shadow-sm relative overflow-hidden"
+      >
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#9CA893] rounded-full blur-[100px] opacity-10" />
+        <h2 className="font-serif text-3xl text-[#2C302E] mb-2">Our Bucket List</h2>
+        <p className="font-sans text-[#826454] mb-8 text-sm">Things we still need to do.</p>
+        <div className="space-y-4">
+          {bucketList.map((item) => (
+            <div
+              key={item.id}
+              onClick={() => toggleBucket(item.id)}
+              className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white/60 cursor-pointer transition-colors border border-transparent hover:border-[#E5D5D5]"
+            >
+              <div
+                className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                  item.done ? 'bg-[#9CA893] border-[#9CA893]' : 'border-[#C69C9C]'
+                }`}
+              >
+                {item.done && <CheckCircle size={14} className="text-white" />}
+              </div>
+              <span
+                className={`font-sans text-base ${
+                  item.done ? 'text-[#826454]/50 line-through' : 'text-[#4A4343]'
+                }`}
+              >
+                {item.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
     </motion.div>
   );
 };
 
-const LetterSection = () => {
-  const [activeEnvelope, setActiveEnvelope] = useState(null);
-  
-  // FEATURE 8: Digital Diary
-  const [diaryEntries, setDiaryEntries] = useLocalStorage('sriju_diary', []);
-  const [newEntry, setNewEntry] = useState("");
-  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+/* -------------------- Bucket List Section -------------------- */
+const BucketListSection: React.FC = () => {
+  const [bucketList, setBucketList] = useCloudStorage<BucketItem[]>('sriju_bucket', BUCKET_LIST);
+  const [newItem, setNewItem] = useState('');
+  const [celebrate, setCelebrate] = useState(false);
 
-  const saveDiary = () => {
-    if(!newEntry.trim()) return;
-    setDiaryEntries([{ date: todayStr, text: newEntry, id: Date.now() }, ...diaryEntries]);
-    setNewEntry("");
+  const total = bucketList.length;
+  const done = bucketList.filter((i) => i.done).length;
+  const progress = total ? (done / total) * 100 : 0;
+  const allDone = total > 0 && done === total;
+
+  const toggleItem = (id: number) => {
+    setBucketList((prev) =>
+      prev.map((i) => {
+        if (i.id === id) {
+          const next = { ...i, done: !i.done };
+          if (next.done) {
+            setCelebrate(true);
+            setTimeout(() => setCelebrate(false), 1500);
+          }
+          return next;
+        }
+        return i;
+      })
+    );
+  };
+
+  const addItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newItem.trim()) return;
+    setBucketList([...bucketList, { id: Date.now(), text: newItem.trim(), done: false }]);
+    setNewItem('');
+  };
+
+  const removeItem = (id: number) => setBucketList(bucketList.filter((i) => i.id !== id));
+
+  const resetAll = () => {
+    if (confirm('Start a fresh list? This will uncheck everything.')) {
+      setBucketList(bucketList.map((i) => ({ ...i, done: false })));
+    }
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="max-w-5xl mx-auto px-4 py-16 flex flex-col items-center relative z-10">
-      
-      {/* Main Letter */}
-      <motion.div initial={{ rotateX: 10, y: 50 }} animate={{ rotateX: 0, y: 0 }} transition={{ duration: 1.5, type: "spring" }} className="bg-[#FDFBF7] p-12 md:p-20 rounded-lg shadow-md border border-[#E5D5D5] relative w-full max-w-3xl transform origin-top bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] mb-20">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#D4C6C6] via-[#C69C9C] to-[#9CA893] rounded-t-lg opacity-30"></div>
-        <h2 className="font-serif text-4xl text-[#2C302E] mb-12 border-b-2 border-[#E5D5D5]/50 pb-6 inline-block">For Tingu,</h2>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-4xl mx-auto px-4 py-16 relative z-10"
+    >
+      <div className="text-center mb-12">
+        <div className="inline-flex items-center gap-3 mb-4">
+          <Target className="text-[#C69C9C]" size={36} />
+          <h2 className="font-serif text-4xl md:text-6xl text-[#2C302E] tracking-wide">
+            Our Bucket List
+          </h2>
+        </div>
+        <p className="font-sans text-[#826454] text-lg italic max-w-2xl mx-auto">
+          Every little dream we're going to chase together, Tingu. Check them off one by one.
+        </p>
+      </div>
+
+      <div className="bg-white/60 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-white/60 shadow-sm mb-8">
+        <div className="flex justify-between items-end mb-3">
+          <span className="font-sans uppercase tracking-widest text-xs text-[#826454]">
+            Progress
+          </span>
+          <span className="font-serif text-2xl text-[#633131]">
+            {done} <span className="text-[#826454] text-lg">/ {total}</span>
+          </span>
+        </div>
+        <div className="w-full h-3 bg-[#F0EBE1] rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-gradient-to-r from-[#C69C9C] to-[#9CA893]"
+            initial={{ width: 0 }}
+            animate={{ width: `${progress}%` }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
+          />
+        </div>
+        {allDone && (
+          <p className="font-['Caveat'] text-2xl text-[#633131] text-center mt-4">
+            All done. Time to write a new list, my love. ♡
+          </p>
+        )}
+      </div>
+
+      <form
+        onSubmit={addItem}
+        className="print-hide flex gap-3 mb-8 bg-white/70 p-3 rounded-2xl border border-[#E5D5D5] shadow-sm"
+      >
+        <input
+          type="text"
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          placeholder="Add a new dream..."
+          className="flex-1 bg-transparent px-4 py-2 font-sans text-base outline-none"
+        />
+        <button
+          type="submit"
+          className="bg-[#C69C9C] text-white px-5 rounded-xl hover:bg-[#B58B8B] flex items-center gap-2 font-sans"
+        >
+          <Plus size={18} /> Add
+        </button>
+      </form>
+
+      <div className="space-y-3">
+        <AnimatePresence>
+          {bucketList.map((item, idx) => (
+            <motion.div
+              key={item.id}
+              layout
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -30 }}
+              transition={{ delay: idx * 0.02 }}
+              className={`group flex items-center gap-4 p-5 rounded-2xl border transition-all cursor-pointer ${
+                item.done
+                  ? 'bg-[#E8ECE4]/60 border-[#9CA893]/40'
+                  : 'bg-white/70 border-[#E5D5D5] hover:border-[#C69C9C] hover:shadow-md'
+              }`}
+              onClick={() => toggleItem(item.id)}
+            >
+              <motion.div
+                whileTap={{ scale: 0.8 }}
+                className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                  item.done
+                    ? 'bg-[#9CA893] border-[#9CA893]'
+                    : 'border-[#C69C9C] group-hover:bg-[#F5E6E6]'
+                }`}
+              >
+                {item.done && <CheckCircle size={16} className="text-white" />}
+              </motion.div>
+              <span
+                className={`flex-1 font-sans text-lg transition-all ${
+                  item.done ? 'line-through text-[#826454]/60' : 'text-[#2C302E]'
+                }`}
+              >
+                {item.text}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  removeItem(item.id);
+                }}
+                className="opacity-0 group-hover:opacity-100 p-2 rounded-full text-[#826454]/40 hover:text-red-500 hover:bg-white transition-all"
+              >
+                <Trash2 size={16} />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {bucketList.length > 0 && (
+        <div className="text-center mt-10">
+          <button
+            onClick={resetAll}
+            className="font-sans text-sm text-[#826454] hover:text-[#633131] underline underline-offset-4"
+          >
+            Reset checkboxes
+          </button>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {celebrate && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0, rotate: -30 }}
+              animate={{ scale: [0, 1.4, 1], rotate: [0, 15, 0] }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ duration: 0.9 }}
+              className="flex flex-col items-center"
+            >
+              <PartyPopper size={120} className="text-[#C69C9C] drop-shadow-2xl" />
+              <p className="font-['Caveat'] text-5xl text-[#633131] mt-4 drop-shadow-lg">
+                Yay!
+              </p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+/* -------------------- Letter Section -------------------- */
+const LetterSection: React.FC = () => {
+  const [activeEnvelope, setActiveEnvelope] = useState<OpenWhenLetter | null>(null);
+
+  const [diaryEntries, setDiaryEntries] = useCloudStorage<DiaryEntry[]>('sriju_diary', []);
+  const [newEntry, setNewEntry] = useState('');
+  const todayStr = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const saveDiary = () => {
+    if (!newEntry.trim()) return;
+    setDiaryEntries([{ date: todayStr, text: newEntry, id: Date.now() }, ...diaryEntries]);
+    setNewEntry('');
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="max-w-5xl mx-auto px-4 py-16 flex flex-col items-center relative z-10"
+    >
+      <motion.div
+        initial={{ rotateX: 10, y: 50 }}
+        animate={{ rotateX: 0, y: 0 }}
+        transition={{ duration: 1.5, type: 'spring' }}
+        className="bg-[#FDFBF7] p-12 md:p-20 rounded-lg shadow-md border border-[#E5D5D5] relative w-full max-w-3xl transform origin-top bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] mb-20"
+      >
+        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-[#D4C6C6] via-[#C69C9C] to-[#9CA893] rounded-t-lg opacity-30" />
+        <h2 className="font-serif text-4xl text-[#2C302E] mb-12 border-b-2 border-[#E5D5D5]/50 pb-6 inline-block">
+          For Tingu,
+        </h2>
         <div className="font-serif text-[#4A4343] space-y-10 leading-[2.5] text-xl md:text-2xl">
           <p>I know this really doesn't feel like much.</p>
-          <p>I know we have grown really, really far away from each other for this to feel like home again.</p>
+          <p>
+            I know we have grown really, really far away from each other for this to feel like home
+            again.
+          </p>
           <p>But trust me, Sriju...</p>
-          <p>when you come back to the same place every day, it'll one day feel like home again.</p>
-          <p className="font-bold text-[#633131] text-3xl italic mt-16 drop-shadow-sm">And you are my home.</p>
+          <p>
+            when you come back to the same place every day, it'll one day feel like home again.
+          </p>
+          <p className="font-bold text-[#633131] text-3xl italic mt-16 drop-shadow-sm">
+            And you are my home.
+          </p>
         </div>
         <div className="mt-24 text-right">
-          <p className="font-['Caveat'] text-5xl text-[#2C302E] rotate-[-5deg] inline-block pr-8">— Jigar</p>
+          <p className="font-['Caveat'] text-5xl text-[#2C302E] rotate-[-5deg] inline-block pr-8">
+            — Jigar
+          </p>
         </div>
       </motion.div>
 
-      {/* Feature 8: Digital Diary */}
       <div className="w-full max-w-4xl mx-auto mb-20 bg-white/50 backdrop-blur-md p-10 rounded-[3rem] border border-white shadow-sm flex flex-col md:flex-row gap-10">
-         <div className="md:w-1/2 flex flex-col">
-            <h2 className="font-serif text-3xl text-[#2C302E] mb-4">Dear Jigar...</h2>
-            <p className="font-sans text-[#826454] mb-6">Write back to me, or just write out your thoughts. It stays safely on your device.</p>
-            <p className="font-sans text-xs uppercase tracking-widest text-[#9CA893] font-bold mb-2">{todayStr}</p>
-            <textarea value={newEntry} onChange={e => setNewEntry(e.target.value)} className="w-full h-40 bg-[#FDFBF7] border border-[#E5D5D5] rounded-2xl p-4 font-sans text-base outline-none resize-none focus:border-[#C69C9C]" placeholder="Today I felt..." />
-            <button onClick={saveDiary} className="mt-4 bg-[#826454] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#633131] transition-colors">Save Entry</button>
-         </div>
-         <div className="md:w-1/2 overflow-y-auto max-h-[400px] custom-scrollbar pr-4 space-y-4">
-            {diaryEntries.map(entry => (
-               <div key={entry.id} className="bg-white/80 p-5 rounded-2xl border border-[#E5D5D5]">
-                 <p className="font-sans text-xs uppercase tracking-widest text-[#C69C9C] font-bold mb-3 border-b border-[#E5D5D5] pb-2">{entry.date}</p>
-                 <p className="font-serif text-[#4A4343] leading-relaxed whitespace-pre-wrap">{entry.text}</p>
-               </div>
-            ))}
-         </div>
+        <div className="md:w-1/2 flex flex-col">
+          <h2 className="font-serif text-3xl text-[#2C302E] mb-4">Dear Jigar...</h2>
+          <p className="font-sans text-[#826454] mb-6">
+            Write back to me, or just write out your thoughts. It stays safely on your device.
+          </p>
+          <p className="font-sans text-xs uppercase tracking-widest text-[#9CA893] font-bold mb-2">
+            {todayStr}
+          </p>
+          <textarea
+            value={newEntry}
+            onChange={(e) => setNewEntry(e.target.value)}
+            className="w-full h-40 bg-[#FDFBF7] border border-[#E5D5D5] rounded-2xl p-4 font-sans text-base outline-none resize-none focus:border-[#C69C9C]"
+            placeholder="Today I felt..."
+          />
+          <button
+            onClick={saveDiary}
+            className="mt-4 bg-[#826454] text-white py-3 rounded-xl font-sans font-medium hover:bg-[#633131] transition-colors"
+          >
+            Save Entry
+          </button>
+        </div>
+        <div className="md:w-1/2 overflow-y-auto max-h-[400px] custom-scrollbar pr-4 space-y-4">
+          {diaryEntries.map((entry) => (
+            <div key={entry.id} className="bg-white/80 p-5 rounded-2xl border border-[#E5D5D5]">
+              <p className="font-sans text-xs uppercase tracking-widest text-[#C69C9C] font-bold mb-3 border-b border-[#E5D5D5] pb-2">
+                {entry.date}
+              </p>
+              <p className="font-serif text-[#4A4343] leading-relaxed whitespace-pre-wrap">
+                {entry.text}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Open When Section */}
       <div className="w-full text-center">
-        <h2 className="font-serif text-3xl text-[#2C302E] mb-12 flex items-center justify-center gap-3"><Mail className="text-[#C69C9C]"/> "Open When" Letters</h2>
+        <h2 className="font-serif text-3xl text-[#2C302E] mb-12 flex items-center justify-center gap-3">
+          <Mail className="text-[#C69C9C]" /> "Open When" Letters
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl mx-auto">
           {OPEN_WHEN_LETTERS.map((letter) => (
-            <motion.div key={letter.id} whileHover={{ scale: 1.02 }} onClick={() => setActiveEnvelope(letter)} className="bg-white/60 p-6 rounded-[2rem] border border-[#E5D5D5] shadow-sm cursor-pointer flex flex-col items-center justify-center min-h-[120px] relative overflow-hidden group">
-               <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#F5E6E6] rounded-full blur-xl group-hover:bg-[#C69C9C] transition-colors duration-500 opacity-50"></div>
-               <Send size={24} className="text-[#826454] mb-3 group-hover:text-[#633131] transition-colors" />
-               <h3 className="font-sans font-medium text-[#2C302E]">{letter.title}</h3>
+            <motion.div
+              key={letter.id}
+              whileHover={{ scale: 1.02 }}
+              onClick={() => setActiveEnvelope(letter)}
+              className="bg-white/60 p-6 rounded-[2rem] border border-[#E5D5D5] shadow-sm cursor-pointer flex flex-col items-center justify-center min-h-[120px] relative overflow-hidden group"
+            >
+              <div className="absolute -top-10 -right-10 w-24 h-24 bg-[#F5E6E6] rounded-full blur-xl group-hover:bg-[#C69C9C] transition-colors duration-500 opacity-50" />
+              <Send size={24} className="text-[#826454] mb-3 group-hover:text-[#633131] transition-colors" />
+              <h3 className="font-sans font-medium text-[#2C302E]">{letter.title}</h3>
             </motion.div>
           ))}
         </div>
@@ -1003,11 +2208,30 @@ const LetterSection = () => {
 
       <AnimatePresence>
         {activeEnvelope && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm px-4">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }} className="bg-[#FDFBF7] p-10 md:p-14 rounded-lg max-w-lg w-full shadow-2xl border border-[#E5D5D5] relative text-center bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
-              <button onClick={() => setActiveEnvelope(null)} className="absolute top-6 right-6 text-[#826454] hover:text-[#2C302E]">Close</button>
-              <h3 className="font-serif text-2xl text-[#633131] mb-8 border-b border-[#E5D5D5] pb-4">{activeEnvelope.title}</h3>
-              <p className="font-serif text-[#4A4343] text-lg md:text-xl leading-relaxed">{activeEnvelope.msg}</p>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-[#FDFBF7] p-10 md:p-14 rounded-lg max-w-lg w-full shadow-2xl border border-[#E5D5D5] relative text-center bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]"
+            >
+              <button
+                onClick={() => setActiveEnvelope(null)}
+                className="absolute top-6 right-6 text-[#826454] hover:text-[#2C302E]"
+              >
+                Close
+              </button>
+              <h3 className="font-serif text-2xl text-[#633131] mb-8 border-b border-[#E5D5D5] pb-4">
+                {activeEnvelope.title}
+              </h3>
+              <p className="font-serif text-[#4A4343] text-lg md:text-xl leading-relaxed">
+                {activeEnvelope.msg}
+              </p>
               <p className="font-['Caveat'] text-3xl text-[#2C302E] mt-10 text-right">— Jigar</p>
             </motion.div>
           </motion.div>
@@ -1017,99 +2241,541 @@ const LetterSection = () => {
   );
 };
 
-const AudioPlayer = ({ activeSection, ambientSound }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioRef = useRef(null);
-  
-  // 1. Determine track URL based on section & ambient sound choice
-  let trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/Tum%20Se%20Hi%20Jab%20We%20Met%20128%20Kbps.mp3"; 
-  if (activeSection === 'study') {
-    if (ambientSound === 'piano') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/e17a138f57b3abecf2e620d537bca1dde11ed013/leberch-ambient-piano-595681.mp3";
-    else if (ambientSound === 'rain') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/freesound_community-rain-sound-and-rainforest-6293.mp3";
-    else if (ambientSound === 'forest') trackUrl = "https://raw.githubusercontent.com/jigarkhadka/asesets/main/zephiramusic-lofi-study-581724(2).mp3";
-  }
-  
-  // 2. FIXED: Only reload audio when the `trackUrl` itself changes, NOT when `activeSection` changes!
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.load();
-      if (isPlaying) {
-        audioRef.current.play().catch(e => console.log("Autoplay prevented", e));
-      }
-    }
-  }, [trackUrl]); // <-- Notice `activeSection` is removed from here
+/* -------------------- Mixtape Panel (slide-in drawer) -------------------- */
+interface MixtapePanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  nowPlaying: NowPlaying | null;
+  setNowPlaying: React.Dispatch<React.SetStateAction<NowPlaying | null>>;
+  isPlaying: boolean;
+  setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+}
 
-  const togglePlay = () => {
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(e => console.log("Play prevented", e));
+const MixtapePanel: React.FC<MixtapePanelProps> = ({
+  isOpen,
+  onClose,
+  nowPlaying,
+  setNowPlaying,
+  isPlaying,
+  setIsPlaying,
+}) => {
+  const [mixtape, setMixtape] = useCloudStorage<MixtapeSong[]>('sriju_mixtape', [
+    {
+      id: 1,
+      title: 'Tum Se Hi',
+      artist: 'Mohit Chauhan',
+      note: 'The song that always plays when I think of you.',
+      youtubeId: undefined,
+    },
+  ]);
+  const [newSongTitle, setNewSongTitle] = useState('');
+  const [newSongNote, setNewSongNote] = useState('');
+  const [newSongLink, setNewSongLink] = useState('');
+
+  const isCurrentSong = (song: MixtapeSong) =>
+    !!song.youtubeId && nowPlaying?.kind === 'youtube' && nowPlaying.videoId === song.youtubeId;
+
+  const playSong = (song: MixtapeSong) => {
+    if (song.youtubeId) {
+      if (isCurrentSong(song)) {
+        setIsPlaying((p) => !p);
+        return;
+      }
+      setNowPlaying({
+        kind: 'youtube',
+        videoId: song.youtubeId,
+        label: song.title,
+        sublabel: song.artist && song.artist !== 'Us' ? song.artist : 'Our mixtape',
+      });
+      setIsPlaying(true);
+      return;
     }
-    setIsPlaying(!isPlaying);
+    if (song.audioUrl) {
+      const isCurrent = nowPlaying?.kind === 'file' && nowPlaying.url === song.audioUrl;
+      if (isCurrent) {
+        setIsPlaying((p) => !p);
+        return;
+      }
+      setNowPlaying({
+        kind: 'file',
+        url: song.audioUrl,
+        label: song.title,
+        sublabel: 'Our mixtape',
+      });
+      setIsPlaying(true);
+    }
+  };
+
+  const addSong = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSongTitle) return;
+    const ytId = extractYouTubeId(newSongLink);
+    setMixtape([
+      ...mixtape,
+      {
+        id: Date.now(),
+        title: newSongTitle,
+        artist: 'Us',
+        note: newSongNote,
+        youtubeId: ytId || undefined,
+        audioUrl: !ytId && newSongLink.trim() ? newSongLink.trim() : undefined,
+      },
+    ]);
+    setNewSongTitle('');
+    setNewSongNote('');
+    setNewSongLink('');
+  };
+
+  const removeSong = (id: number) => setMixtape(mixtape.filter((s) => s.id !== id));
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[110]"
+          />
+          <motion.div
+            initial={{ x: '100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="fixed top-0 right-0 h-full w-full max-w-md bg-[#2C302E] z-[115] shadow-2xl border-l border-[#4A4343] overflow-hidden flex flex-col"
+          >
+            <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: noiseSvg }} />
+            <div className="relative z-10 flex flex-col h-full text-[#FDFBF7]">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 md:p-8 border-b border-white/10">
+                <div>
+                  <h2 className="font-serif text-3xl flex items-center gap-3">
+                    <Music className="text-[#C69C9C]" /> Our Mixtape
+                  </h2>
+                  <p className="font-sans text-[#A3B18A] text-xs mt-1">
+                    Songs that belong to us. Tap play — it plays in the corner.
+                  </p>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-full hover:bg-white/10 transition-colors"
+                  aria-label="Close mixtape"
+                >
+                  <X size={22} />
+                </button>
+              </div>
+
+              {/* Song list */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-8 space-y-4">
+                {mixtape.length === 0 && (
+                  <p className="font-['Caveat'] text-2xl text-[#C69C9C] text-center mt-8 opacity-80">
+                    No songs yet. Add your first one below.
+                  </p>
+                )}
+                {mixtape.map((song) => (
+                  <div
+                    key={song.id}
+                    className="bg-white/5 border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-colors group"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-sans font-bold text-lg text-white truncate">{song.title}</p>
+                        {song.artist && song.artist !== 'Us' && (
+                          <p className="font-sans text-xs text-[#A3B18A] mt-0.5">{song.artist}</p>
+                        )}
+                        <p className="font-['Caveat'] text-xl text-[#C69C9C] mt-2 opacity-90">
+                          "{song.note}"
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        {(song.youtubeId || song.audioUrl) && (
+                          <button
+                            onClick={() => playSong(song)}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                              isCurrentSong(song) && isPlaying
+                                ? 'bg-[#9CA893] text-white'
+                                : 'bg-[#C69C9C] text-white hover:bg-[#B58B8B]'
+                            }`}
+                            aria-label={
+                              isCurrentSong(song) && isPlaying
+                                ? `Pause ${song.title}`
+                                : `Play ${song.title}`
+                            }
+                          >
+                            {isCurrentSong(song) && isPlaying ? (
+                              <Pause size={14} fill="currentColor" />
+                            ) : (
+                              <Play size={14} fill="currentColor" className="ml-0.5" />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => removeSong(song.id)}
+                          className="p-1.5 rounded-full text-white/30 hover:text-red-400 hover:bg-white/10 transition-all"
+                          aria-label="Remove song"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    {isCurrentSong(song) && (
+                      <p className="font-sans text-[10px] text-[#A3B18A] mt-3 flex items-center gap-1">
+                        <Volume2 size={12} /> Playing in the corner player
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Add form */}
+              <div className="border-t border-white/10 p-6 md:p-8">
+                <form onSubmit={addSong} className="flex flex-col gap-2">
+                  <input
+                    type="text"
+                    value={newSongTitle}
+                    onChange={(e) => setNewSongTitle(e.target.value)}
+                    placeholder="Song name..."
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
+                  />
+                  <input
+                    type="text"
+                    value={newSongNote}
+                    onChange={(e) => setNewSongNote(e.target.value)}
+                    placeholder="Why is it our song?"
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
+                  />
+                  <input
+                    type="text"
+                    value={newSongLink}
+                    onChange={(e) => setNewSongLink(e.target.value)}
+                    placeholder="YouTube link or direct audio URL (optional)"
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 font-sans text-sm outline-none text-white focus:border-[#C69C9C] placeholder-white/40"
+                  />
+                  <button
+                    type="submit"
+                    className="bg-[#C69C9C] text-white py-2 rounded-xl mt-2 font-sans font-medium hover:bg-[#B58B8B] transition-colors"
+                  >
+                    Add to Tape
+                  </button>
+                </form>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+
+/* -------------------- Audio Player (global) -------------------- */
+interface AudioPlayerProps {
+  activeSection: string;
+  ambientSound: string;
+  nowPlaying: NowPlaying | null;
+  setNowPlaying: React.Dispatch<React.SetStateAction<NowPlaying | null>>;
+  isPlaying: boolean;
+  setIsPlaying: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  activeSection,
+  ambientSound,
+  nowPlaying,
+  setNowPlaying,
+  isPlaying,
+  setIsPlaying,
+}) => {
+  const [customTrack, setCustomTrack] = useState<{ url: string; name: string } | null>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const ytHostRef = useRef<HTMLDivElement>(null);
+  const ytPlayerRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isPlayingRef = useRef(isPlaying);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  }, [isPlaying]);
+
+  const source: NowPlaying = useMemo(() => {
+    if (nowPlaying) return nowPlaying;
+    if (customTrack)
+      return { kind: 'file', url: customTrack.url, label: customTrack.name, sublabel: 'Your upload' };
+    if (activeSection === 'study') {
+      const track = STUDY_TRACKS[ambientSound] || STUDY_TRACKS.piano;
+      return { kind: 'file', url: track.url, label: track.label, sublabel: 'Zen sounds' };
+    }
+    return { kind: 'file', url: '/audio/theme.mp3', label: 'Tum Se Hi', sublabel: 'Our song' };
+  }, [nowPlaying, customTrack, activeSection, ambientSound]);
+
+  const sourceKey = source.kind === 'youtube' ? `yt:${source.videoId}` : `file:${source.url}`;
+
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    if (source.kind === 'youtube') {
+      audio?.pause();
+      let cancelled = false;
+      loadYouTubeApi()
+        .then((YT) => {
+          if (cancelled || !ytHostRef.current) return;
+          if (!ytPlayerRef.current) {
+            ytPlayerRef.current = new YT.Player(ytHostRef.current, {
+              videoId: source.videoId,
+              playerVars: {
+                autoplay: 0,
+                controls: 0,
+                disablekb: 1,
+                playsinline: 1,
+                rel: 0,
+                modestbranding: 1,
+              },
+              events: {
+                onReady: (e: any) => {
+                  if (isPlayingRef.current) e.target.playVideo();
+                },
+              },
+            });
+          } else {
+            ytPlayerRef.current.loadVideoById(source.videoId);
+            if (!isPlayingRef.current) {
+              window.setTimeout(() => {
+                try {
+                  ytPlayerRef.current?.pauseVideo();
+                } catch {
+                  /* noop */
+                }
+              }, 400);
+            }
+          }
+        })
+        .catch(() => {
+          /* offline — nothing to do */
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    try {
+      ytPlayerRef.current?.stopVideo?.();
+    } catch {
+      /* noop */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceKey]);
+
+  useEffect(() => {
+    if (source.kind === 'youtube') {
+      const player = ytPlayerRef.current;
+      if (!player?.playVideo) return;
+      if (isPlaying) player.playVideo();
+      else player.pauseVideo();
+      return;
+    }
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (isPlaying) audio.play().catch(() => { /* needs a user gesture */ });
+    else audio.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPlaying, sourceKey]);
+
+  const togglePlay = () => setIsPlaying((p) => !p);
+
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (customTrack) URL.revokeObjectURL(customTrack.url);
+    const url = URL.createObjectURL(file);
+    setCustomTrack({ url, name: file.name.replace(/\.[^.]+$/, '') });
+    setNowPlaying(null);
+    setIsPlaying(true);
+    e.target.value = '';
+  };
+
+  const clearCustom = () => {
+    if (customTrack) URL.revokeObjectURL(customTrack.url);
+    setCustomTrack(null);
+    setIsPlaying(false);
+  };
+
+  const stopMixtapeSong = () => {
+    setNowPlaying(null);
+    setIsPlaying(false);
   };
 
   return (
-    <div className="fixed top-8 left-8 md:left-auto md:right-8 z-[80] bg-white/60 backdrop-blur-xl p-2 rounded-full shadow-sm border border-[#E5D5D5] flex items-center gap-4 pr-5 group hover:bg-white/90">
-      <audio ref={audioRef} loop src={trackUrl} />
-      <button onClick={togglePlay} className="p-4 bg-[#F5E6E6] rounded-full text-[#633131]">
-        {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" className="ml-1" />}
-      </button>
-      <div className="hidden md:flex flex-col">
-        <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-[#826454] font-bold">
-          {activeSection === 'study' ? (ambientSound === 'piano' ? 'Piano Focus' : ambientSound === 'rain' ? 'Rainstorm' : 'Lofi Study') : 'Tum Se Hi'}
-        </span>
-        <span className="text-[10px] font-sans text-[#826454]/70 mt-0.5">{isPlaying ? 'Playing' : 'Paused'}</span>
+    <div className="fixed top-8 left-8 md:left-auto md:right-8 z-[80] bg-white/60 backdrop-blur-xl p-2 rounded-full shadow-sm border border-[#E5D5D5] flex items-center gap-2 md:gap-3 pr-3 md:pr-5 group hover:bg-white/90 transition-colors max-w-[92vw]">
+      <audio ref={audioRef} loop src={source.kind === 'file' ? source.url : undefined} />
+
+      <div className="fixed -left-[9999px] top-0 w-[200px] h-[200px] pointer-events-none" aria-hidden="true">
+        <div ref={ytHostRef} />
       </div>
+
+      <button
+        onClick={togglePlay}
+        className="p-3 md:p-4 bg-[#F5E6E6] rounded-full text-[#633131] hover:bg-[#C69C9C] hover:text-white transition-colors flex-shrink-0"
+        aria-label={isPlaying ? 'Pause' : 'Play'}
+      >
+        {isPlaying ? (
+          <Pause size={18} fill="currentColor" />
+        ) : (
+          <Play size={18} fill="currentColor" className="ml-1" />
+        )}
+      </button>
+
+      <div className="hidden md:flex flex-col min-w-[100px] max-w-[170px]">
+        <span className="text-[11px] font-sans uppercase tracking-[0.2em] text-[#826454] font-bold truncate">
+          {source.label}
+        </span>
+        <span className="text-[10px] font-sans text-[#826454]/70 mt-0.5 truncate">
+          {source.kind === 'youtube'
+            ? `${isPlaying ? 'Playing' : 'Paused'} · ${source.sublabel || 'YouTube'}`
+            : `${isPlaying ? 'Playing' : 'Paused'}${source.sublabel ? ` · ${source.sublabel}` : ''}`}
+        </span>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*"
+        onChange={handleUpload}
+        className="hidden"
+      />
+      <button
+        onClick={() => fileInputRef.current?.click()}
+        className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-[#C69C9C] hover:text-white transition-colors flex-shrink-0"
+        title="Upload your own MP3"
+        aria-label="Upload custom track"
+      >
+        <Upload size={16} />
+      </button>
+
+      {customTrack && (
+        <button
+          onClick={clearCustom}
+          className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-red-400 hover:text-white transition-colors flex-shrink-0"
+          title="Remove custom track"
+          aria-label="Remove custom track"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
+
+      {nowPlaying && (
+        <button
+          onClick={stopMixtapeSong}
+          className="p-2 rounded-full bg-[#F0EBE1] text-[#826454] hover:bg-red-400 hover:text-white transition-colors flex-shrink-0"
+          title="Stop this song"
+          aria-label="Stop this song"
+        >
+          <X size={14} />
+        </button>
+      )}
     </div>
   );
 };
 
-const EasterEggTransition = ({ onComplete }) => {
-  useEffect(() => { const timer = setTimeout(onComplete, 4000); return () => clearTimeout(timer); }, [onComplete]);
+/* -------------------- Easter Egg -------------------- */
+const EasterEggTransition: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 4000);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 1.5 } }} className="fixed inset-0 z-[200] flex items-center justify-center bg-[#2C302E] overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, transition: { duration: 1.5 } }}
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-[#2C302E] overflow-hidden"
+    >
       <div className="absolute inset-0 opacity-20" style={{ backgroundImage: noiseSvg }} />
-      <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ duration: 2, ease: "easeOut" }} className="w-[800px] h-[800px] bg-gradient-to-tr from-[#633131] to-[#C69C9C] rounded-full blur-[100px] opacity-40 absolute" />
-      <motion.h2 initial={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }} animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }} transition={{ duration: 1.5, delay: 0.5 }} className="font-serif text-5xl md:text-7xl text-[#FDFBF7] relative z-10 tracking-widest text-center px-4">
+      <motion.div
+        initial={{ scale: 0, rotate: -180 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ duration: 2, ease: 'easeOut' }}
+        className="w-[800px] h-[800px] bg-gradient-to-tr from-[#633131] to-[#C69C9C] rounded-full blur-[100px] opacity-40 absolute"
+      />
+      <motion.h2
+        initial={{ opacity: 0, scale: 0.8, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+        transition={{ duration: 1.5, delay: 0.5 }}
+        className="font-serif text-5xl md:text-7xl text-[#FDFBF7] relative z-10 tracking-widest text-center px-4"
+      >
         The day it all started.
       </motion.h2>
     </motion.div>
   );
 };
 
+/* -------------------- App -------------------- */
 export default function App() {
   const [hasOpened, setHasOpened] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
-  const [appMood, setAppMood] = useState(null);
+  const [appMood, setAppMood] = useState<Mood | null>(null);
   const [showEasterEgg, setShowEasterEgg] = useState(false);
   const [ambientSound, setAmbientSound] = useState('piano');
 
+  // One global player, so mixtape links play in the background
+  const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // Mixtape is now its own drawer, triggered by the floating button (not the nav bar)
+  const [showMixtape, setShowMixtape] = useState(false);
+
   useEffect(() => {
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap';
+    link.href =
+      'https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
     const style = document.createElement('style');
     style.innerHTML = `
-      .custom-scrollbar::-webkit-scrollbar { width: 6px; } 
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; } 
-      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #E5D5D5; border-radius: 10px; } 
+      .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #E5D5D5; border-radius: 10px; }
       .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #C69C9C; }
       .hide-scroll::-webkit-scrollbar { display: none; }
       .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+      @media print {
+        .print-hide { display: none !important; }
+        .app-root { background: #FDFBF7 !important; }
+        .app-root, .app-root * { box-shadow: none !important; backdrop-filter: none !important; }
+      }
     `;
     document.head.appendChild(style);
-    return () => { document.head.removeChild(link); document.head.removeChild(style); };
+    return () => {
+      document.head.removeChild(link);
+      document.head.removeChild(style);
+    };
   }, []);
 
   const bgColor = appMood ? appMood.bgColor : '#F9F6F0';
   const triggerEasterEgg = () => setShowEasterEgg(true);
-  const handleEasterEggComplete = () => { setShowEasterEgg(false); setActiveSection('story'); };
+  const handleEasterEggComplete = () => {
+    setShowEasterEgg(false);
+    setActiveSection('story');
+  };
+
+  const handleSetAmbient = (sound: string) => {
+    setNowPlaying(null);
+    setAmbientSound(sound);
+  };
 
   return (
-    <div className="min-h-screen selection:bg-[#C69C9C] selection:text-white relative overflow-x-hidden transition-colors duration-[2000ms] ease-in-out" style={{ fontFamily: "'Inter', sans-serif", backgroundColor: bgColor }}>
-      <div className="absolute inset-0 pointer-events-none mix-blend-multiply" style={{ backgroundImage: noiseSvg, zIndex: 1 }} />
-      <FloatingEnvironment />
+    <div
+      className="app-root min-h-screen selection:bg-[#C69C9C] selection:text-white relative overflow-x-hidden transition-colors duration-[2000ms] ease-in-out"
+      style={{ fontFamily: "'Inter', sans-serif", backgroundColor: bgColor }}
+    >
+      <div
+        className="absolute inset-0 pointer-events-none mix-blend-multiply print-hide"
+        style={{ backgroundImage: noiseSvg, zIndex: 1 }}
+      />
+      <div className="print-hide">
+        <FloatingEnvironment />
+      </div>
 
       <AnimatePresence>
         {!hasOpened ? (
@@ -1117,31 +2783,92 @@ export default function App() {
         ) : showEasterEgg ? (
           <EasterEggTransition key="easter-egg" onComplete={handleEasterEggComplete} />
         ) : (
-          <motion.div key="main-app" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1.5 }} className="pb-40 relative z-10">
-            <AudioPlayer activeSection={activeSection} ambientSound={ambientSound} />
+          <motion.div
+            key="main-app"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 1.5 }}
+            className="pb-40 relative z-10"
+          >
+            <div className="print-hide">
+              <AudioPlayer
+                activeSection={activeSection}
+                ambientSound={ambientSound}
+                nowPlaying={nowPlaying}
+                setNowPlaying={setNowPlaying}
+                isPlaying={isPlaying}
+                setIsPlaying={setIsPlaying}
+              />
+            </div>
+
+            {/* Floating Mixtape button — mirrored opposite the audio player so they don't collide.
+                On mobile the player is top-left, so this sits top-right. On desktop the player is
+                top-right, so this sits top-left. */}
+            <motion.button
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.7, duration: 0.8 }}
+              onClick={() => setShowMixtape(true)}
+              className="print-hide fixed top-8 right-4 md:right-auto md:left-8 z-[80] bg-white/60 backdrop-blur-xl p-3 md:p-4 rounded-full shadow-sm border border-[#E5D5D5] flex items-center gap-2 group hover:bg-white/90 transition-colors"
+              title="Open Our Mixtape"
+              aria-label="Open our mixtape"
+            >
+              <Music size={18} className="text-[#633131] group-hover:text-[#C69C9C] transition-colors" />
+              <span className="hidden md:inline font-sans text-[11px] uppercase tracking-[0.2em] text-[#826454] font-bold">
+                Mixtape
+              </span>
+            </motion.button>
+
+            <MixtapePanel
+              isOpen={showMixtape}
+              onClose={() => setShowMixtape(false)}
+              nowPlaying={nowPlaying}
+              setNowPlaying={setNowPlaying}
+              isPlaying={isPlaying}
+              setIsPlaying={setIsPlaying}
+            />
 
             <div className="pt-24 md:pt-20 min-h-[85vh]">
               <AnimatePresence mode="wait">
-                {activeSection === 'home' && <HomeSection key="home" setSection={setActiveSection} triggerEasterEgg={triggerEasterEgg} />}
-                {activeSection === 'mood' && <MoodCorner key="mood" currentMood={appMood} setAppMood={setAppMood} />}
-                {activeSection === 'study' && <StudyCorner key="study" setAmbientSound={setAmbientSound} />}
+                {activeSection === 'home' && (
+                  <HomeSection key="home" setSection={setActiveSection} triggerEasterEgg={triggerEasterEgg} />
+                )}
+                {activeSection === 'mood' && (
+                  <MoodCorner key="mood" currentMood={appMood} setAppMood={setAppMood} />
+                )}
+                {activeSection === 'study' && (
+                  <StudyCorner
+                    key="study"
+                    ambientSound={ambientSound}
+                    setAmbientSound={handleSetAmbient}
+                  />
+                )}
                 {activeSection === 'finance' && <FinanceCorner key="finance" />}
+                {activeSection === 'bucket' && <BucketListSection key="bucket" />}
                 {activeSection === 'story' && <StoryTimeline key="story" />}
                 {activeSection === 'letter' && <LetterSection key="letter" />}
               </AnimatePresence>
             </div>
 
-            <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5, duration: 1 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[80] bg-white/70 backdrop-blur-2xl px-4 py-3 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[95vw] hide-scroll">
+            <motion.div
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5, duration: 1 }}
+              className="print-hide fixed bottom-8 left-1/2 -translate-x-1/2 z-[80] bg-white/70 backdrop-blur-2xl px-4 py-3 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] border border-white/50 flex items-center gap-2 md:gap-4 overflow-x-auto max-w-[95vw] hide-scroll"
+            >
               <NavBtn icon={Home} label="Home" isActive={activeSection === 'home'} onClick={() => setActiveSection('home')} />
               <NavBtn icon={Palette} label="Mood" isActive={activeSection === 'mood'} onClick={() => setActiveSection('mood')} />
               <NavBtn icon={Book} label="Study" isActive={activeSection === 'study'} onClick={() => setActiveSection('study')} />
               <NavBtn icon={Coins} label="Finance" isActive={activeSection === 'finance'} onClick={() => setActiveSection('finance')} />
+              <NavBtn icon={Target} label="Bucket" isActive={activeSection === 'bucket'} onClick={() => setActiveSection('bucket')} />
               <NavBtn icon={Heart} label="Story" isActive={activeSection === 'story'} onClick={() => setActiveSection('story')} />
               <NavBtn icon={Mail} label="Letter" isActive={activeSection === 'letter'} onClick={() => setActiveSection('letter')} />
             </motion.div>
 
             <div className="text-center py-16 mt-16 relative z-10">
-              <p className="font-serif italic text-[#826454] opacity-60 text-lg tracking-wide hover:opacity-100 transition-opacity">Made for you, by Jigar ♡</p>
+              <p className="font-serif italic text-[#826454] opacity-60 text-lg tracking-wide hover:opacity-100 transition-opacity">
+                Made for you, by Jigar ♡
+              </p>
             </div>
           </motion.div>
         )}
